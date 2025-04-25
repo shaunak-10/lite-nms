@@ -129,7 +129,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
         LOGGER.info("Fetching discovery profile list");
 
         DATABASE_CLIENT
-                .query(GET_ALL_DISCOVERY)
+                .preparedQuery(GET_ALL_DISCOVERY)
                 .execute(databaseResponse ->
                 {
                     if (databaseResponse.succeeded())
@@ -345,7 +345,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
         LOGGER.info("Starting discovery run for all devices");
 
         DATABASE_CLIENT
-                .query(DATA_TO_PLUGIN_FOR_DISCOVERY)
+                .preparedQuery(DATA_TO_PLUGIN_FOR_DISCOVERY)
                 .execute(dbRes ->
                 {
                     if (dbRes.failed())

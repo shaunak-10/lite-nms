@@ -11,53 +11,57 @@ public class MainApp {
     {
         Vertx vertx = Vertx.vertx();
 
-        DatabaseClient.testConnection(databaseResponse ->
+        DatabaseClient.testConnection(dbRes ->
         {
-            if (databaseResponse.succeeded())
+            if (dbRes.failed())
             {
-                System.out.println("✅ Database connected successfully!");
-
-                vertx.deployVerticle(SchedulerVerticle.class.getName(), res ->{
-                    if (res.succeeded())
-                    {
-                        System.out.println("🚀 Scheduler verticle deployed!");
-                    }
-                    else
-                    {
-                        System.err.println("❌ Failed to deploy verticle: " + res.cause());
-                    }
-                });
-
-                vertx.deployVerticle(PluginVerticle.class.getName(), res ->
-                {
-                    if (res.succeeded())
-                    {
-                        System.out.println("🚀 Plugin verticle deployed!");
-                    }
-                    else
-                    {
-                        System.err.println("❌ Failed to deploy verticle: " + res.cause());
-                    }
-                });
-
-                vertx.deployVerticle(HttpServerVerticle.class.getName(), res ->
-                {
-                    if (res.succeeded())
-                    {
-                        System.out.println("🚀 HTTP server verticle deployed!");
-                    }
-                    else
-                    {
-                        System.err.println("❌ Failed to deploy verticle: " + res.cause());
-                    }
-                });
-            }
-            else
-            {
-                System.err.println("❌ Failed to connect to database: " + databaseResponse.cause().getMessage());
+                System.err.println("❌ Failed to connect to DB: " + dbRes.cause());
 
                 vertx.close();
+
+                return;
             }
+
+            System.out.println("✅ Database connected successfully!");
+
+            vertx.deployVerticle(PluginVerticle.class.getName(), pluginRes ->
+            {
+                if (pluginRes.failed())
+                {
+                    System.err.println("❌ Plugin verticle failed: " + pluginRes.cause());
+
+                    vertx.close();
+
+                    return;
+                }
+
+                vertx.deployVerticle(SchedulerVerticle.class.getName(), schedRes ->
+                {
+                    if (schedRes.failed())
+                    {
+                        System.err.println("❌ Plugin verticle failed: " + schedRes.cause());
+
+                        vertx.close();
+
+                        return;
+                    }
+
+                    vertx.deployVerticle(new HttpServerVerticle(), httpRes ->
+                    {
+                        if (httpRes.failed())
+                        {
+                            System.err.println("❌ HTTP server verticle failed: " + httpRes.cause());
+
+                            vertx.close();
+                        }
+                        else
+                        {
+                            System.out.println("🚀 All verticles deployed successfully!");
+                        }
+                    });
+                });
+            });
         });
+
     }
 }

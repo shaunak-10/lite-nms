@@ -95,7 +95,7 @@ public class CredentialHandler extends AbstractCrudHandler
         LOGGER.info("Fetching credential list");
 
         DATABASE_CLIENT
-                .query(GET_ALL_CREDENTIALS)
+                .preparedQuery(GET_ALL_CREDENTIALS)
                 .execute(databaseResponse ->
                 {
                     if (databaseResponse.succeeded())

@@ -9,8 +9,6 @@ import io.vertx.sqlclient.PoolOptions;
 import io.vertx.sqlclient.SqlClient;
 import io.vertx.pgclient.PgBuilder;
 
-import java.util.concurrent.TimeUnit;
-
 public class DatabaseClient
 {
     private static final Dotenv dotenv = Dotenv.load();
@@ -28,12 +26,10 @@ public class DatabaseClient
                     .setUser(dotenv.get("DB_USER"))
                     .setPassword(dotenv.get("DB_PASSWORD"))
                     .setConnectTimeout(5000)
-                    .setIdleTimeout(60000);
+                    .setIdleTimeout(5*60*1000);
 
             PoolOptions poolOptions = new PoolOptions()
-                    .setMaxSize(10)
-                    .setIdleTimeout(1)
-                    .setIdleTimeoutUnit(TimeUnit.MINUTES);
+                    .setMaxSize(10);
 
             client = PgBuilder.client()
                     .with(poolOptions)

@@ -83,6 +83,7 @@ public class PluginVerticle extends AbstractVerticle
                     try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream())))
                     {
                         String errLine;
+
                         while ((errLine = errorReader.readLine()) != null)
                         {
                             errorOutput.append(errLine);

@@ -59,7 +59,7 @@ public class SchedulerVerticle extends AbstractVerticle
             LOGGER.info("Running scheduled polling task");
 
             DATABASE_CLIENT
-                    .query(DATA_TO_PLUGIN_FOR_POLLING)
+                    .preparedQuery(DATA_TO_PLUGIN_FOR_POLLING)
                     .execute(dbRes ->
                     {
                         if (dbRes.failed())

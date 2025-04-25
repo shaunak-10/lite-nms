@@ -139,7 +139,7 @@ public class ProvisionHandler extends AbstractCrudHandler
         LOGGER.info("Fetching provisioned device list");
 
         DATABASE_CLIENT
-                .query(GET_ALL_PROVISIONS)
+                .preparedQuery(GET_ALL_PROVISIONS)
                 .execute(databaseResponse ->
                 {
                     if (databaseResponse.succeeded())
