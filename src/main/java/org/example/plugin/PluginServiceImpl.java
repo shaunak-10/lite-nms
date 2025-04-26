@@ -1,45 +1,41 @@
-package org.example.verticles;
+package org.example.plugin;
 
-import io.vertx.core.AbstractVerticle;
-import io.vertx.core.Promise;
-import io.vertx.core.eventbus.Message;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
-import org.example.utils.LoggerUtil;
-
 import java.io.*;
 import java.util.logging.Logger;
 
-import static org.example.constants.AppConstants.AddressesAndPaths.*;
+import static org.example.constants.AppConstants.AddressesAndPaths.PLUGIN_PATH;
+import org.example.utils.LoggerUtil;
 
-public class PluginVerticle extends AbstractVerticle
+public class PluginServiceImpl implements PluginService
 {
+
     private static final Logger LOGGER = LoggerUtil.getPluginLogger();
 
+    private final Vertx vertx;
+
+    public PluginServiceImpl(Vertx vertx)
+    {
+        this.vertx = vertx;
+    }
+
     @Override
-    public void start(Promise<Void> startPromise)
+    public Future<JsonArray> runSSHReachability(JsonArray devices)
     {
-        vertx.eventBus().consumer(SSH_DISCOVERY, this::handleSSHCheck);
-
-        vertx.eventBus().consumer(SSH_METRICS, this::handleSSHMetrics);
-
-        LOGGER.info("PluginVerticle deployed and listening on event bus...");
-
-        startPromise.complete();
+        return executePlugin(devices, "reachability");
     }
 
-    private void handleSSHMetrics(Message<JsonArray> devices)
+    @Override
+    public Future<JsonArray> runSSHMetrics(JsonArray devices)
     {
-        executePlugin(devices, "metrics");
+        return executePlugin(devices, "metrics");
     }
 
-    private void handleSSHCheck(Message<JsonArray> devices)
+    private Future<JsonArray> executePlugin(JsonArray devices, String command)
     {
-        executePlugin(devices, "reachability");
-    }
-
-    private void executePlugin(Message<JsonArray> devices, String command)
-    {
-        vertx.executeBlocking(() ->
+        return vertx.executeBlocking(() ->
         {
             Process process = null;
 
@@ -49,15 +45,13 @@ public class PluginVerticle extends AbstractVerticle
 
                 process = pb.start();
 
-                // Send JSON input to plugin via stdin
                 try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream())))
                 {
-                    writer.write(devices.body().encode());
+                    writer.write(devices.encode());
 
                     writer.flush();
                 }
 
-                // Read stdout (plugin output)
                 StringBuilder output = new StringBuilder();
 
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
@@ -90,16 +84,18 @@ public class PluginVerticle extends AbstractVerticle
                         }
                     }
 
-                    LOGGER.severe("Plugin error (exit code " + exitCode + "): " + errorOutput);
+                    String errorMsg = "Plugin error (exit code " + exitCode + "): " + errorOutput;
 
-                    return null;
+                    LOGGER.severe(errorMsg);
+
+                    throw new RuntimeException(errorMsg);
                 }
             }
             catch (Exception e)
             {
                 LOGGER.severe("Plugin execution error: " + e.getMessage());
 
-                return null;
+                throw new RuntimeException(e);
             }
             finally
             {
@@ -108,18 +104,6 @@ public class PluginVerticle extends AbstractVerticle
                     process.destroy();
                 }
             }
-        },false, res ->
-        {
-            if (res.succeeded() && res.result() != null)
-            {
-                devices.reply(res.result());
-            }
-            else
-            {
-                String errorMsg = res.cause() != null ? res.cause().getMessage() : "Plugin failed to return data";
-
-                devices.fail(500, errorMsg);
-            }
-        });
+        }, false);
     }
 }

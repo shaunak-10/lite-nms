@@ -3,7 +3,7 @@ package org.example;
 import io.vertx.core.Vertx;
 import org.example.db.DatabaseClient;
 import org.example.verticles.HttpServerVerticle;
-import org.example.verticles.PluginVerticle;
+import org.example.plugin.PluginVerticle;
 import org.example.verticles.SchedulerVerticle;
 
 public class MainApp {

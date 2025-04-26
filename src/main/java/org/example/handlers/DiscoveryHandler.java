@@ -8,6 +8,8 @@ import io.vertx.sqlclient.RowSet;
 import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
 import org.example.db.DatabaseClient;
+import org.example.plugin.PluginService;
+import org.example.plugin.PluginVerticle;
 import org.example.utils.*;
 
 import java.util.ArrayList;
@@ -16,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import static org.example.constants.AppConstants.AddressesAndPaths.SSH_DISCOVERY;
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
@@ -408,77 +409,76 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                             if (handleIfEmpty(ctx, finalDevices)) return;
 
-                            ctx.vertx().eventBus().request(SSH_DISCOVERY, finalDevices, pluginRes ->
-                            {
-                                if (pluginRes.failed())
-                                {
-                                    LOGGER.warning("SSH plugin call failed: " + pluginRes.cause().getMessage());
+                            PluginService pluginService = PluginService.createProxy(ctx.vertx(), PluginVerticle.SERVICE_ADDRESS);
 
-                                    ctx.response()
-                                            .setStatusCode(500)
-                                            .end(new JsonObject().put(ERROR, PLUGIN_EXECUTION_FAILED).encode());
-                                    return;
-                                }
-
-                                JsonArray sshResults = (JsonArray) pluginRes.result().body();
-
-                                Map<Integer, Boolean> sshReachabilityMap = new HashMap<>();
-
-                                for (int i = 0; i < sshResults.size(); i++)
-                                {
-                                    JsonObject pluginResult = sshResults.getJsonObject(i);
-
-                                    sshReachabilityMap.put(pluginResult.getInteger(ID), pluginResult.getBoolean("reachable"));
-                                }
-
-                                for (int i = 0; i < defaultResults.size(); i++)
-                                {
-                                    JsonObject deviceResult = defaultResults.getJsonObject(i);
-
-                                    int id = deviceResult.getInteger(ID);
-
-                                    if (sshReachabilityMap.containsKey(id))
+                            pluginService.runSSHReachability(finalDevices)
+                                    .onSuccess(sshResults ->
                                     {
-                                        deviceResult.put("reachable", sshReachabilityMap.get(id));
-                                    }
-                                }
+                                        Map<Integer, Boolean> sshReachabilityMap = new HashMap<>();
 
-
-                                LOGGER.info("Discovery completed with " + defaultResults.size() + " results");
-
-                                List<Tuple> batchParams = new ArrayList<>();
-
-                                for (int i = 0; i < defaultResults.size(); i++)
-                                {
-                                    JsonObject result = defaultResults.getJsonObject(i);
-
-                                    int id = result.getInteger(ID);
-
-                                    boolean reachable = result.getBoolean("reachable");
-
-                                    String status = reachable ? ACTIVE : INACTIVE;
-
-                                    batchParams.add(Tuple.of(status, id));
-                                }
-
-
-                                DATABASE_CLIENT
-                                        .preparedQuery(UPDATE_DISCOVERY_STATUS)
-                                        .executeBatch(batchParams)
-                                        .onSuccess(res ->
+                                        for (int i = 0; i < sshResults.size(); i++)
                                         {
-                                            LOGGER.info("Batch status update successful for " + defaultResults.size() + " devices.");
+                                            JsonObject pluginResult = sshResults.getJsonObject(i);
 
-                                            ctx.json(new JsonObject().put("results", defaultResults));
-                                        })
-                                        .onFailure(err ->
+                                            sshReachabilityMap.put(pluginResult.getInteger(ID), pluginResult.getBoolean("reachable"));
+                                        }
+
+                                        for (int i = 0; i < defaultResults.size(); i++)
                                         {
-                                            LOGGER.warning("Batch update failed: " + err.getMessage());
+                                            JsonObject deviceResult = defaultResults.getJsonObject(i);
 
-                                            ctx.response().setStatusCode(500)
-                                                    .end(new JsonObject().put(ERROR, "Status update failed").encode());
-                                        });
-                            });
+                                            int id = deviceResult.getInteger(ID);
+
+                                            if (sshReachabilityMap.containsKey(id))
+                                            {
+                                                deviceResult.put("reachable", sshReachabilityMap.get(id));
+                                            }
+                                        }
+
+                                        LOGGER.info("Discovery completed with " + defaultResults.size() + " results");
+
+                                        List<Tuple> batchParams = new ArrayList<>();
+
+                                        for (int i = 0; i < defaultResults.size(); i++)
+                                        {
+                                            JsonObject result = defaultResults.getJsonObject(i);
+
+                                            int id = result.getInteger(ID);
+
+                                            boolean reachable = result.getBoolean("reachable");
+
+                                            String status = reachable ? ACTIVE : INACTIVE;
+
+                                            batchParams.add(Tuple.of(status, id));
+                                        }
+
+                                        DATABASE_CLIENT
+                                                .preparedQuery(UPDATE_DISCOVERY_STATUS)
+                                                .executeBatch(batchParams)
+                                                .onSuccess(res ->
+                                                {
+                                                    LOGGER.info("Batch status update successful for " + defaultResults.size() + " devices.");
+
+                                                    ctx.json(new JsonObject().put("results", defaultResults));
+                                                })
+                                                .onFailure(err ->
+                                                {
+                                                    LOGGER.warning("Batch update failed: " + err.getMessage());
+
+                                                    ctx.response().setStatusCode(500)
+                                                            .end(new JsonObject().put(ERROR, "Status update failed").encode());
+                                                });
+
+                                    })
+                                    .onFailure(err ->
+                                    {
+                                        LOGGER.warning("SSH plugin call failed: " + err.getMessage());
+
+                                        ctx.response()
+                                                .setStatusCode(500)
+                                                .end(new JsonObject().put(ERROR, "Plugin execution failed").encode());
+                                    });
+
                         });
                     });
                 });

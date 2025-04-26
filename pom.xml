@@ -45,6 +45,18 @@
             <artifactId>dotenv-java</artifactId>
             <version>3.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-service-proxy</artifactId>
+            <version>4.5.14</version>
+        </dependency>
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-codegen</artifactId>
+            <version>4.5.14</version>
+            <classifier>processor</classifier>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
 </project>

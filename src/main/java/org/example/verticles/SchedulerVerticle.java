@@ -8,6 +8,8 @@ import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
 import org.example.db.DatabaseClient;
+import org.example.plugin.PluginService;
+import org.example.plugin.PluginVerticle;
 import org.example.utils.DecryptionUtil;
 import org.example.utils.LoggerUtil;
 
@@ -97,48 +99,45 @@ public class SchedulerVerticle extends AbstractVerticle
                             return;
                         }
 
-                        vertx.eventBus().request(SSH_METRICS, devices, pluginRes ->
-                        {
-                            if (pluginRes.failed())
-                            {
-                                LOGGER.warning("Plugin polling failed: " + pluginRes.cause().getMessage());
+                        PluginService pluginService = PluginService.createProxy(vertx, PluginVerticle.SERVICE_ADDRESS);
 
-                                return;
-                            }
+                        pluginService.runSSHMetrics(devices)
+                                .onSuccess(metricsResults ->
+                                {
+                                    LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
 
-                            JsonArray results = (JsonArray) pluginRes.result().body();
+                                    List<Tuple> batchParams = new ArrayList<>();
 
-                            LOGGER.info("Polling completed. Received " + results.size() + " results.");
-
-                            List<Tuple> batchParams = new ArrayList<>();
-
-                            for (int i = 0; i < results.size(); i++)
-                            {
-                                JsonObject result = results.getJsonObject(i);
-
-                                int deviceId = result.getInteger("id");
-
-                                JsonObject metrics = result.copy();
-
-                                metrics.remove("id");
-
-                                batchParams.add(Tuple.of(deviceId, metrics.encode()));
-                            }
-
-                            DATABASE_CLIENT
-                                    .preparedQuery(INSERT_POLLING_RESULT)
-                                    .executeBatch(batchParams, batchRes ->
+                                    for (int i = 0; i < metricsResults.size(); i++)
                                     {
-                                        if (batchRes.failed())
-                                        {
-                                            LOGGER.warning("Batch insert of polling results failed: " + batchRes.cause().getMessage());
-                                        }
-                                        else
-                                        {
-                                            LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
-                                        }
-                                    });
-                        });
+                                        JsonObject result = metricsResults.getJsonObject(i);
+
+                                        int deviceId = result.getInteger("id");
+
+                                        JsonObject metrics = result.copy();
+
+                                        metrics.remove("id");
+
+                                        batchParams.add(Tuple.of(deviceId, metrics.encode()));
+                                    }
+
+                                    DATABASE_CLIENT
+                                            .preparedQuery(INSERT_POLLING_RESULT)
+                                            .executeBatch(batchParams, batchRes ->
+                                            {
+                                                if (batchRes.failed())
+                                                {
+                                                    LOGGER.warning("Batch insert of polling results failed: " + batchRes.cause().getMessage());
+                                                }
+                                                else
+                                                {
+                                                    LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
+                                                }
+                                            });
+
+                                })
+                                .onFailure(err ->
+                                        LOGGER.warning("Plugin polling failed: " + err.getMessage()));
                     });
         });
 
