@@ -1,5 +1,6 @@
 package org.example.handlers;
 
+import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -7,7 +8,6 @@ import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.RowSet;
 import io.vertx.sqlclient.SqlClient;
 
-import static org.example.constants.AppConstants.AddressesAndPaths.*;
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.ProvisionField.DISCOVERY_PROFILE_ID;
 import static org.example.constants.AppConstants.ProvisionQuery.*;
@@ -18,6 +18,8 @@ import static org.example.constants.AppConstants.Headers.*;
 
 import io.vertx.sqlclient.Tuple;
 import org.example.db.DatabaseClient;
+import org.example.scheduler.SchedulerService;
+import org.example.scheduler.SchedulerVerticle;
 import org.example.utils.LoggerUtil;
 
 import java.util.logging.Logger;
@@ -276,47 +278,34 @@ public class ProvisionHandler extends AbstractCrudHandler
             interval = body.getInteger("interval");
         }
 
-        JsonObject message = new JsonObject().put("interval", interval);
+        SchedulerService schedulerService = SchedulerService.createProxy(ctx.vertx(), SchedulerVerticle.SERVICE_ADDRESS);
 
-        ctx.vertx().eventBus().request(POLLING_START, message, res ->
-        {
-            if (res.failed())
-            {
-                ctx.response()
-                        .setStatusCode(400)
-                        .putHeader(CONTENT_TYPE,APPLICATION_JSON)
-                        .end(new JsonObject().put(ERROR, res.cause().getMessage()).encode());
-            }
-            else
-            {
-                JsonObject reply = (JsonObject) res.result().body();
-
-                ctx.response()
-                        .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                        .end(reply.encodePrettily());
-            }
-        });
+        schedulerService.startPolling(interval)
+                .onSuccess(reply->
+                        ctx.response()
+                                .putHeader(CONTENT_TYPE,APPLICATION_JSON)
+                                .end(new JsonObject().put(MESSAGE,reply).encodePrettily()))
+                .onFailure(reply->
+                        ctx.response()
+                                .setStatusCode(400)
+                                .putHeader(CONTENT_TYPE,APPLICATION_JSON)
+                                .end(new JsonObject().put(ERROR,reply.getMessage()).encodePrettily()));
     }
 
-    public void stopPolling(RoutingContext ctx) {
-        ctx.vertx().eventBus().request(POLLING_STOP, null, res ->
-        {
-            if (res.failed())
-            {
-                ctx.response()
-                        .setStatusCode(400)
-                        .putHeader(CONTENT_TYPE,APPLICATION_JSON)
-                        .end(new JsonObject().put(ERROR, res.cause().getMessage()).encode());
-            }
-            else
-            {
-                JsonObject reply = (JsonObject) res.result().body();
+    public void stopPolling(RoutingContext ctx)
+    {
+        SchedulerService schedulerService = SchedulerService.createProxy(ctx.vertx(), SchedulerVerticle.SERVICE_ADDRESS);
 
-                ctx.response()
-                        .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                        .end(reply.encodePrettily());
-            }
-        });
+        schedulerService.stopPolling()
+                .onSuccess(reply->
+                        ctx.response()
+                                .putHeader(CONTENT_TYPE,APPLICATION_JSON)
+                                .end(new JsonObject().put(MESSAGE,reply).encodePrettily()))
+                .onFailure(reply->
+                        ctx.response()
+                                .setStatusCode(400)
+                                .putHeader(CONTENT_TYPE,APPLICATION_JSON)
+                                .end(new JsonObject().put(ERROR,reply.getMessage()).encodePrettily()));
     }
 
 }

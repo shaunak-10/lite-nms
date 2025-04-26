@@ -1,7 +1,7 @@
-package org.example.verticles;
+package org.example.scheduler;
 
-import io.vertx.core.AbstractVerticle;
-import io.vertx.core.eventbus.Message;
+import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.sqlclient.Row;
@@ -18,42 +18,39 @@ import java.util.List;
 import java.util.logging.Logger;
 
 import static org.example.constants.AppConstants.ProvisionQuery.DATA_TO_PLUGIN_FOR_POLLING;
+import static org.example.constants.AppConstants.ProvisionQuery.INSERT_POLLING_RESULT;
 import static org.example.constants.AppConstants.ProvisionField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
-import static org.example.constants.AppConstants.AddressesAndPaths.*;
-import static org.example.constants.AppConstants.ProvisionQuery.INSERT_POLLING_RESULT;
 
-public class SchedulerVerticle extends AbstractVerticle
+public class SchedulerServiceImpl implements SchedulerService
 {
 
     private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
 
     private static final SqlClient DATABASE_CLIENT = DatabaseClient.getClient();
 
+    private final PluginService pluginService;
+
     private long pollingTimerId = -1;
 
-    @Override
-    public void start()
-    {
-        vertx.eventBus().consumer(POLLING_START, this::startPolling);
+    private final Vertx vertx;
 
-        vertx.eventBus().consumer(POLLING_STOP, this::stopPolling);
+    public SchedulerServiceImpl(Vertx vertx)
+    {
+        this.pluginService = PluginService.createProxy(vertx, PluginVerticle.SERVICE_ADDRESS);
+
+        this.vertx = vertx;
     }
 
-    private void startPolling(Message<Object> message)
+    @Override
+    public Future<String> startPolling(int interval)
     {
-        JsonObject payload = (JsonObject) message.body();
-
-        int interval = payload.getInteger("interval", 60000); // default 60 sec
-
         if (pollingTimerId != -1)
         {
             LOGGER.warning("Polling already running. Ignoring new start request.");
 
-            message.fail(1, "Polling already running");
-
-            return;
+            return Future.failedFuture("Polling already running");
         }
 
         pollingTimerId = vertx.setPeriodic(interval, id ->
@@ -99,8 +96,6 @@ public class SchedulerVerticle extends AbstractVerticle
                             return;
                         }
 
-                        PluginService pluginService = PluginService.createProxy(vertx, PluginVerticle.SERVICE_ADDRESS);
-
                         pluginService.runSSHMetrics(devices)
                                 .onSuccess(metricsResults ->
                                 {
@@ -136,17 +131,17 @@ public class SchedulerVerticle extends AbstractVerticle
                                             });
 
                                 })
-                                .onFailure(err ->
-                                        LOGGER.warning("Plugin polling failed: " + err.getMessage()));
+                                .onFailure(err -> LOGGER.warning("Plugin polling failed: " + err.getMessage()));
                     });
         });
 
         LOGGER.info("Polling scheduled every " + interval + "ms");
 
-        message.reply(new JsonObject().put("message", "Polling scheduled"));
+        return Future.succeededFuture("Polling scheduled");
     }
 
-    private void stopPolling(Message<Object> message)
+    @Override
+    public Future<String> stopPolling()
     {
         if (pollingTimerId != -1)
         {
@@ -156,14 +151,13 @@ public class SchedulerVerticle extends AbstractVerticle
 
             LOGGER.info("Polling timer cancelled");
 
-            message.reply(new JsonObject().put("message", "Polling stopped"));
-
+            return Future.succeededFuture("Polling stopped");
         }
         else
         {
             LOGGER.info("No polling timer to stop");
 
-            message.fail(1,"No polling to stop");
+            return Future.failedFuture("No polling to stop");
         }
     }
 }

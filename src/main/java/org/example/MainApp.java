@@ -4,7 +4,7 @@ import io.vertx.core.Vertx;
 import org.example.db.DatabaseClient;
 import org.example.verticles.HttpServerVerticle;
 import org.example.plugin.PluginVerticle;
-import org.example.verticles.SchedulerVerticle;
+import org.example.scheduler.SchedulerVerticle;
 
 public class MainApp {
     public static void main(String[] args)
