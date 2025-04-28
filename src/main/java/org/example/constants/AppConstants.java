@@ -15,7 +15,7 @@ public class AppConstants {
         public static final String GET_ALL_DISCOVERY = "SELECT id, name, ip, port, status, credential_profile_id FROM discovery_profile ORDER BY id ASC";
         public static final String GET_DISCOVERY_BY_ID = "SELECT * FROM discovery_profile WHERE id = $1";
         public static final String DELETE_DISCOVERY = "DELETE FROM discovery_profile WHERE id = $1";
-        public static final String UPDATE_DISCOVERY = "UPDATE discovery_profile SET name = $1, ip = $2, port = $3, status = $4, credential_profile_id = $5 WHERE id = $6";
+        public static final String UPDATE_DISCOVERY = "UPDATE discovery_profile SET name = $1, ip = $2, port = $3, credential_profile_id = $4 WHERE id = $5";
         public static final String DATA_TO_PLUGIN_FOR_DISCOVERY = "SELECT d.id, d.port, d.ip, c.username, c.password FROM discovery_profile d JOIN credential_profile c ON d.credential_profile_id = c.id";
         public static final String UPDATE_DISCOVERY_STATUS = "UPDATE discovery_profile SET status = $1 WHERE id = $2";
 

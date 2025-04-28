@@ -200,7 +200,6 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 });
     }
 
-    @Override
     public void update(RoutingContext ctx)
     {
         int id = validateIdFromPath(ctx);
@@ -218,95 +217,76 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
         LOGGER.info("Updating discovery profile ID " + id + " with data: " + body.encode());
 
-        DATABASE_CLIENT
-                .preparedQuery(GET_DISCOVERY_BY_ID)
-                .execute(Tuple.of(id), dbRes ->
-                {
-                    if (dbRes.failed())
+        try
+        {
+            String name = body.getString(NAME);
+
+            String ip = body.getString(IP);
+
+            int port = body.getInteger(PORT, 22);
+
+            int credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
+
+            if (name == null || ip == null || credentialProfileId == 0)
+            {
+                handleMissingData(ctx, LOGGER, MISSING_FIELDS);
+
+                return;
+            }
+
+            if (isNotValidPort(port))
+            {
+                handleInvalidData(ctx, LOGGER, INVALID_PORT);
+
+                return;
+            }
+
+            IpResolutionUtil.resolveAndValidateIp(ctx.vertx(), ip)
+                    .onSuccess(validIp ->
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, dbRes.cause());
+                        if (validIp == null)
+                        {
+                            handleInvalidData(ctx, LOGGER, INVALID_IP);
 
-                        return;
-                    }
+                            return;
+                        }
 
-                    RowSet<Row> result = dbRes.result();
-
-                    if (result.size() == 0)
-                    {
-                        handleNotFound(ctx, LOGGER);
-
-                        return;
-                    }
-
-                    Row row = result.iterator().next();
-
-                    String name = body.getString(NAME, row.getString(NAME));
-
-                    String ipFromBody = body.getString(IP);
-
-                    int port = body.getInteger(PORT, row.getInteger(PORT));
-
-                    String status = row.getString(STATUS);
-
-                    int credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID));
-
-                    if (isNotValidPort(port))
-                    {
-                        handleInvalidData(ctx, LOGGER, INVALID_PORT);
-
-                        return;
-                    }
-
-                    if (ipFromBody == null)
-                    {
-                        String ip = row.getString(IP);
-
-                        updateDiscoveryInDb(ctx, name, ip, port, status, credentialProfileId, id);
-                    }
-                    else
-                    {
-                        IpResolutionUtil.resolveAndValidateIp(ctx.vertx(), ipFromBody)
-                                .onSuccess(validIp ->
+                        DATABASE_CLIENT
+                                .preparedQuery(UPDATE_DISCOVERY)
+                                .execute(Tuple.of(name, validIp, port, credentialProfileId, id), updateRes ->
                                 {
-                                    if (validIp == null)
+                                    if (updateRes.succeeded())
                                     {
-                                        handleInvalidData(ctx, LOGGER, INVALID_IP);
+                                        if (updateRes.result().rowCount() == 0)
+                                        {
+                                            handleNotFound(ctx, LOGGER);
+                                        }
+                                        else
+                                        {
+                                            LOGGER.info("Discovery profile updated successfully for ID " + id);
+
+                                            handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
+                                        }
                                     }
                                     else
                                     {
-                                        updateDiscoveryInDb(ctx, name, validIp, port, status, credentialProfileId, id);
+                                        handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, updateRes.cause());
                                     }
-                                })
-                                .onFailure(err ->
-                                {
-                                    LOGGER.warning("IP resolution failed during update: " + err.getMessage());
-
-                                    handleInvalidData(ctx, LOGGER, INVALID_IP);
                                 });
-                    }
-                });
-    }
-
-    private void updateDiscoveryInDb(RoutingContext ctx, String name, String ip, int port,
-                                     String status, int credentialProfileId, int id)
-    {
-        DATABASE_CLIENT
-                .preparedQuery(UPDATE_DISCOVERY)
-                .execute(Tuple.of(name, ip, port, status, credentialProfileId, id), updateRes ->
-                {
-                    if (updateRes.succeeded())
+                    })
+                    .onFailure(err ->
                     {
-                        LOGGER.info("Discovery profile updated successfully for ID " + id);
+                        LOGGER.warning("IP resolution failed during update: " + err.getMessage());
 
-                        handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
-                    }
-                    else
-                    {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, updateRes.cause());
-                    }
-                });
+                        handleInvalidData(ctx, LOGGER, INVALID_IP);
+                    });
+        }
+        catch (Exception e)
+        {
+            LOGGER.warning("Invalid input in update(): " + e.getMessage());
+            handleInvalidData(ctx, LOGGER, INVALID_JSON_BODY);
+        }
     }
-
 
     @Override
     public void delete(RoutingContext ctx)
@@ -476,7 +456,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                                         ctx.response()
                                                 .setStatusCode(500)
-                                                .end(new JsonObject().put(ERROR, "Plugin execution failed").encode());
+                                                .end(new JsonObject().put(ERROR, PLUGIN_EXECUTION_FAILED).encode());
                                     });
 
                         });

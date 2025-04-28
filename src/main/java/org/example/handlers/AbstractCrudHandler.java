@@ -1,5 +1,7 @@
 package org.example.handlers;
 
+import io.vertx.core.Future;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 
@@ -11,7 +13,6 @@ import static org.example.constants.AppConstants.Headers.*;
 
 public abstract class AbstractCrudHandler
 {
-
     public abstract void add(RoutingContext ctx);
 
     public abstract void list(RoutingContext ctx);
@@ -41,7 +42,7 @@ public abstract class AbstractCrudHandler
         {
             return Integer.parseInt(idParam);
         }
-        catch (NumberFormatException e)
+        catch (Exception e)
         {
             ctx.response()
                     .setStatusCode(400)
@@ -121,4 +122,27 @@ public abstract class AbstractCrudHandler
                 .end(new JsonObject().put(ERROR, message).encodePrettily());
     }
 
+    void handleDatabaseOperation(RoutingContext ctx, Future<JsonObject> dbOperation, String successMessage, String failureMessage, Logger LOGGER)
+    {
+        dbOperation
+                .onSuccess(response ->
+                {
+                    if (response == null)
+                    {
+                        handleNotFound(ctx, LOGGER);
+                    }
+                    else
+                    {
+                        LOGGER.info(successMessage);
+
+                        handleSuccess(ctx, response);
+                    }
+                })
+                .onFailure(err ->
+                {
+                    LOGGER.severe(failureMessage + ": " + err.getMessage());
+
+                    handleDatabaseError(ctx, LOGGER, failureMessage, err);
+                });
+    }
 }

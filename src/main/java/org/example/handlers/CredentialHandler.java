@@ -36,30 +36,17 @@ public class CredentialHandler extends AbstractCrudHandler
     @Override
     public void add(RoutingContext ctx)
     {
-
         JsonObject body = ctx.body().asJsonObject();
 
-        if (body == null)
-        {
-            handleMissingData(ctx, LOGGER, INVALID_JSON_BODY);
+        if (notValidateCredentialFields(ctx, body)) return;
 
-            return;
-        }
+        LOGGER.info("Adding new credential: " + body.encode());
 
         String name = body.getString(NAME);
 
         String username = body.getString(USERNAME);
 
         String password = body.getString(PASSWORD);
-
-        if (name == null || username == null || password == null)
-        {
-            handleMissingData(ctx, LOGGER, MISSING_FIELDS);
-
-            return;
-        }
-
-        LOGGER.info("Adding new credential: " + body.encode());
 
         try
         {
@@ -168,58 +155,44 @@ public class CredentialHandler extends AbstractCrudHandler
 
         JsonObject body = ctx.body().asJsonObject();
 
-        if (body == null || body.isEmpty())
-        {
-            handleMissingData(ctx, LOGGER, NO_DATA_TO_UPDATE);
+        if (notValidateCredentialFields(ctx, body)) return;
 
-            return;
+        String name = body.getString(NAME);
+        String username = body.getString(USERNAME);
+        String password = body.getString(PASSWORD);
+
+        try
+        {
+            password = EncryptionUtil.encrypt(password);
+        }
+        catch (Exception e)
+        {
+            LOGGER.severe(e.getMessage());
         }
 
         LOGGER.info("Updating credential ID " + id + " with data: " + body.encode());
 
         DATABASE_CLIENT
-                .preparedQuery(GET_CREDENTIAL_BY_ID)
-                .execute(Tuple.of(id), databaseResponse ->
+                .preparedQuery(UPDATE_CREDENTIAL)
+                .execute(Tuple.of(name, username, password, id), updateRes ->
                 {
-                    if (databaseResponse.failed())
+                    if (updateRes.succeeded())
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, databaseResponse.cause());
+                        if (updateRes.result().rowCount() == 0)
+                        {
+                            handleNotFound(ctx, LOGGER);
+                        }
+                        else
+                        {
+                            LOGGER.info("Credential updated successfully for ID " + id);
 
-                        return;
+                            handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
+                        }
                     }
-
-                    RowSet<Row> result = databaseResponse.result();
-
-                    if (result.size() == 0)
+                    else
                     {
-                        handleNotFound(ctx, LOGGER);
-
-                        return;
+                        handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, updateRes.cause());
                     }
-
-                    Row row = result.iterator().next();
-
-                    String name = body.getString(NAME, row.getString(NAME));
-
-                    String username = body.getString(USERNAME, row.getString(USERNAME));
-
-                    String password = body.getString(PASSWORD, row.getString(PASSWORD));
-
-                    DATABASE_CLIENT
-                            .preparedQuery(UPDATE_CREDENTIAL)
-                            .execute(Tuple.of(name, username, password, id), updateRes ->
-                            {
-                                if (updateRes.succeeded())
-                                {
-                                    LOGGER.info("Credential updated successfully for ID " + id);
-
-                                    handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
-                                }
-                                else
-                                {
-                                    handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, updateRes.cause());
-                                }
-                            });
                 });
     }
 
@@ -255,4 +228,30 @@ public class CredentialHandler extends AbstractCrudHandler
                     }
                 });
     }
+
+    private boolean notValidateCredentialFields(RoutingContext ctx, JsonObject body)
+    {
+        if (body == null)
+        {
+            handleMissingData(ctx, LOGGER, INVALID_JSON_BODY);
+
+            return true;
+        }
+
+        String name = body.getString(NAME);
+
+        String username = body.getString(USERNAME);
+
+        String password = body.getString(PASSWORD);
+
+        if (name == null || username == null || password == null)
+        {
+            handleMissingData(ctx, LOGGER, MISSING_FIELDS);
+
+            return true;
+        }
+
+        return false;
+    }
+
 }
