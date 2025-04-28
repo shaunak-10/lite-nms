@@ -3,14 +3,10 @@ package org.example.handlers;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.sqlclient.Row;
-import io.vertx.sqlclient.RowSet;
-import io.vertx.sqlclient.SqlClient;
-import io.vertx.sqlclient.Tuple;
-import org.example.db.DatabaseClient;
 import org.example.utils.EncryptionUtil;
 import org.example.utils.LoggerUtil;
 
+import java.util.List;
 import java.util.logging.Logger;
 
 import static org.example.constants.AppConstants.CredentialQuery.*;
@@ -18,17 +14,15 @@ import static org.example.constants.AppConstants.CredentialField.*;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
 
-public class CredentialHandler extends AbstractCrudHandler
-{
-    private static final CredentialHandler INSTANCE = new CredentialHandler();
+public class CredentialHandler extends AbstractCrudHandler {
 
     private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
 
-    private static final SqlClient DATABASE_CLIENT = DatabaseClient.getClient();
+    private static final CredentialHandler INSTANCE = new CredentialHandler();
 
     private CredentialHandler() {}
 
-    public static CredentialHandler getInstance()
+    public static synchronized CredentialHandler getInstance()
     {
         return INSTANCE;
     }
@@ -57,13 +51,14 @@ public class CredentialHandler extends AbstractCrudHandler
             LOGGER.severe(e.getMessage());
         }
 
-        DATABASE_CLIENT
-                .preparedQuery(ADD_CREDENTIAL)
-                .execute(Tuple.of(name, username, password), databaseResponse ->
+        executeQuery(ADD_CREDENTIAL, List.of(name, username, password))
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
+                    JsonArray rows = result.getJsonArray("rows");
+
+                    if (rows != null && !rows.isEmpty())
                     {
-                        int id = databaseResponse.result().iterator().next().getInteger(ID);
+                        int id = rows.getJsonObject(0).getInteger(ID);
 
                         LOGGER.info("Credential added with ID: " + id);
 
@@ -71,9 +66,10 @@ public class CredentialHandler extends AbstractCrudHandler
                     }
                     else
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, databaseResponse.cause());
+                        handleSuccess(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS));
                     }
-                });
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, cause));
     }
 
     @Override
@@ -81,31 +77,28 @@ public class CredentialHandler extends AbstractCrudHandler
     {
         LOGGER.info("Fetching credential list");
 
-        DATABASE_CLIENT
-                .preparedQuery(GET_ALL_CREDENTIALS)
-                .execute(databaseResponse ->
+        executeQuery(GET_ALL_CREDENTIALS)
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
+                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+
+                    JsonArray credentialList = new JsonArray();
+
+                    for (int i = 0; i < rows.size(); i++)
                     {
-                        JsonArray credentialList = new JsonArray();
+                        JsonObject row = rows.getJsonObject(i);
 
-                        for (Row row : databaseResponse.result())
-                        {
-                            credentialList.add(new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put(NAME, row.getString(NAME))
-                                    .put(USERNAME, row.getString(USERNAME)));
-                        }
-
-                        LOGGER.info("Fetched " + credentialList.size() + " credentials");
-
-                        handleSuccess(ctx, new JsonObject().put(CREDENTIALS, credentialList));
+                        credentialList.add(new JsonObject()
+                                .put(ID, row.getInteger(ID))
+                                .put(NAME, row.getString(NAME))
+                                .put(USERNAME, row.getString(USERNAME)));
                     }
-                    else
-                    {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, databaseResponse.cause());
-                    }
-                });
+
+                    LOGGER.info("Fetched " + credentialList.size() + " credentials");
+
+                    handleSuccess(ctx, new JsonObject().put(CREDENTIALS, credentialList));
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
 
     @Override
@@ -117,33 +110,26 @@ public class CredentialHandler extends AbstractCrudHandler
 
         LOGGER.info("Fetching credential with ID: " + id);
 
-        DATABASE_CLIENT
-                .preparedQuery(GET_CREDENTIAL_BY_ID)
-                .execute(Tuple.of(id), databaseResponse ->
+        executeQuery(GET_CREDENTIAL_BY_ID, List.of(id))
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
+                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+
+                    if (rows.isEmpty())
                     {
-                        RowSet<Row> result = databaseResponse.result();
-
-                        if (result.size() == 0)
-                        {
-                            handleNotFound(ctx, LOGGER);
-                        }
-                        else
-                        {
-                            Row row = result.iterator().next();
-
-                            handleSuccess(ctx, new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put(NAME, row.getString(NAME))
-                                    .put(USERNAME, row.getString(USERNAME)));
-                        }
+                        handleNotFound(ctx, LOGGER);
                     }
                     else
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, databaseResponse.cause());
+                        JsonObject row = rows.getJsonObject(0);
+
+                        handleSuccess(ctx, new JsonObject()
+                                .put(ID, row.getInteger(ID))
+                                .put(NAME, row.getString(NAME))
+                                .put(USERNAME, row.getString(USERNAME)));
                     }
-                });
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
 
     @Override
@@ -158,7 +144,9 @@ public class CredentialHandler extends AbstractCrudHandler
         if (notValidateCredentialFields(ctx, body)) return;
 
         String name = body.getString(NAME);
+
         String username = body.getString(USERNAME);
+
         String password = body.getString(PASSWORD);
 
         try
@@ -172,28 +160,23 @@ public class CredentialHandler extends AbstractCrudHandler
 
         LOGGER.info("Updating credential ID " + id + " with data: " + body.encode());
 
-        DATABASE_CLIENT
-                .preparedQuery(UPDATE_CREDENTIAL)
-                .execute(Tuple.of(name, username, password, id), updateRes ->
+        executeQuery(UPDATE_CREDENTIAL, List.of(name, username, password, id))
+                .onSuccess(result ->
                 {
-                    if (updateRes.succeeded())
-                    {
-                        if (updateRes.result().rowCount() == 0)
-                        {
-                            handleNotFound(ctx, LOGGER);
-                        }
-                        else
-                        {
-                            LOGGER.info("Credential updated successfully for ID " + id);
+                    int rowCount = result.getInteger("rowCount", 0);
 
-                            handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
-                        }
+                    if (rowCount == 0)
+                    {
+                        handleNotFound(ctx, LOGGER);
                     }
                     else
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, updateRes.cause());
+                        LOGGER.info("Credential updated successfully for ID " + id);
+
+                        handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
                     }
-                });
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, cause));
     }
 
     @Override
@@ -205,28 +188,23 @@ public class CredentialHandler extends AbstractCrudHandler
 
         LOGGER.info("Deleting credential ID: " + id);
 
-        DATABASE_CLIENT
-                .preparedQuery(DELETE_CREDENTIAL)
-                .execute(Tuple.of(id), res ->
+        executeQuery(DELETE_CREDENTIAL, List.of(id))
+                .onSuccess(result ->
                 {
-                    if (res.succeeded())
-                    {
-                        if (res.result().rowCount() == 0)
-                        {
-                            handleNotFound(ctx, LOGGER);
-                        }
-                        else
-                        {
-                            LOGGER.info("Credential deleted for ID: " + id);
+                    int rowCount = result.getInteger("rowCount", 0);
 
-                            handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
-                        }
+                    if (rowCount == 0)
+                    {
+                        handleNotFound(ctx, LOGGER);
                     }
                     else
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, res.cause());
+                        LOGGER.info("Credential deleted for ID: " + id);
+
+                        handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                     }
-                });
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, cause));
     }
 
     private boolean notValidateCredentialFields(RoutingContext ctx, JsonObject body)
@@ -253,5 +231,4 @@ public class CredentialHandler extends AbstractCrudHandler
 
         return false;
     }
-
 }

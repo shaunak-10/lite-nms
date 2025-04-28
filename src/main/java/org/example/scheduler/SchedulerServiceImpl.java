@@ -4,16 +4,15 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import io.vertx.sqlclient.Row;
-import io.vertx.sqlclient.SqlClient;
-import io.vertx.sqlclient.Tuple;
-import org.example.db.DatabaseClient;
+import org.example.db.DatabaseService;
+import org.example.db.DatabaseVerticle;
 import org.example.plugin.PluginService;
 import org.example.plugin.PluginVerticle;
 import org.example.utils.DecryptionUtil;
 import org.example.utils.LoggerUtil;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -23,14 +22,13 @@ import static org.example.constants.AppConstants.ProvisionField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
 
-public class SchedulerServiceImpl implements SchedulerService
-{
+public class SchedulerServiceImpl implements SchedulerService {
 
     private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
 
-    private static final SqlClient DATABASE_CLIENT = DatabaseClient.getClient();
-
     private final PluginService pluginService;
+
+    private final DatabaseService databaseService;
 
     private long pollingTimerId = -1;
 
@@ -39,6 +37,8 @@ public class SchedulerServiceImpl implements SchedulerService
     public SchedulerServiceImpl(Vertx vertx)
     {
         this.pluginService = PluginService.createProxy(vertx, PluginVerticle.SERVICE_ADDRESS);
+
+        this.databaseService = DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS);
 
         this.vertx = vertx;
     }
@@ -57,23 +57,29 @@ public class SchedulerServiceImpl implements SchedulerService
         {
             LOGGER.info("Running scheduled polling task");
 
-            DATABASE_CLIENT
-                    .preparedQuery(DATA_TO_PLUGIN_FOR_POLLING)
-                    .execute(dbRes ->
+            JsonObject request = new JsonObject()
+                    .put("query", DATA_TO_PLUGIN_FOR_POLLING)
+                    .put("params", Collections.emptyList());
+
+            databaseService.executeQuery(request)
+                    .onSuccess(dbResponse ->
                     {
-                        if (dbRes.failed())
+                        if (!dbResponse.getBoolean("success"))
                         {
-                            LOGGER.warning("DB error during polling: " + dbRes.cause().getMessage());
+                            LOGGER.warning("DB query failed: " + dbResponse.getString("error"));
 
                             return;
                         }
 
                         JsonArray devices = new JsonArray();
 
-                        for (Row row : dbRes.result())
+                        JsonArray rows = dbResponse.getJsonArray("rows", new JsonArray());
+
+                        for (Object rowObj : rows)
                         {
-                            try
-                            {
+                            JsonObject row = (JsonObject) rowObj;
+
+                            try {
                                 JsonObject device = new JsonObject()
                                         .put(ID, row.getInteger(ID))
                                         .put(PORT, row.getInteger(PORT))
@@ -82,6 +88,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                         .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)));
 
                                 devices.add(device);
+
                             }
                             catch (Exception e)
                             {
@@ -101,7 +108,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                 {
                                     LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
 
-                                    List<Tuple> batchParams = new ArrayList<>();
+                                    List<List<Object>> batchParams = new ArrayList<>();
 
                                     for (int i = 0; i < metricsResults.size(); i++)
                                     {
@@ -113,26 +120,28 @@ public class SchedulerServiceImpl implements SchedulerService
 
                                         metrics.remove("id");
 
-                                        batchParams.add(Tuple.of(deviceId, metrics.encode()));
+                                        batchParams.add(List.of(deviceId, metrics.encode()));
                                     }
 
-                                    DATABASE_CLIENT
-                                            .preparedQuery(INSERT_POLLING_RESULT)
-                                            .executeBatch(batchParams, batchRes ->
+                                    databaseService.executeBatch(new JsonObject()
+                                                    .put("query", INSERT_POLLING_RESULT)
+                                                    .put("params", new JsonArray(batchParams)))
+                                            .onSuccess(batchResponse ->
                                             {
-                                                if (batchRes.failed())
-                                                {
-                                                    LOGGER.warning("Batch insert of polling results failed: " + batchRes.cause().getMessage());
-                                                }
-                                                else
+                                                if (batchResponse.getBoolean("success"))
                                                 {
                                                     LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
                                                 }
-                                            });
-
+                                                else
+                                                {
+                                                    LOGGER.warning("Batch insert of polling results failed: " + batchResponse.getString("error"));
+                                                }
+                                            })
+                                            .onFailure(err -> LOGGER.warning("Batch insert failed: " + err.getMessage()));
                                 })
                                 .onFailure(err -> LOGGER.warning("Plugin polling failed: " + err.getMessage()));
-                    });
+                    })
+                    .onFailure(err -> LOGGER.warning("DB query failed: " + err.getMessage()));
         });
 
         LOGGER.info("Polling scheduled every " + interval + "ms");

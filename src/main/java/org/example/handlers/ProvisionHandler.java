@@ -1,12 +1,8 @@
 package org.example.handlers;
 
-import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.sqlclient.Row;
-import io.vertx.sqlclient.RowSet;
-import io.vertx.sqlclient.SqlClient;
 
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.ProvisionField.DISCOVERY_PROFILE_ID;
@@ -16,12 +12,11 @@ import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
 import static org.example.constants.AppConstants.Headers.*;
 
-import io.vertx.sqlclient.Tuple;
-import org.example.db.DatabaseClient;
 import org.example.scheduler.SchedulerService;
 import org.example.scheduler.SchedulerVerticle;
 import org.example.utils.LoggerUtil;
 
+import java.util.List;
 import java.util.logging.Logger;
 
 public class ProvisionHandler extends AbstractCrudHandler
@@ -29,8 +24,6 @@ public class ProvisionHandler extends AbstractCrudHandler
     private static final ProvisionHandler INSTANCE = new ProvisionHandler();
 
     private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
-
-    private static final SqlClient DATABASE_CLIENT = DatabaseClient.getClient();
 
     private ProvisionHandler() {}
 
@@ -51,130 +44,106 @@ public class ProvisionHandler extends AbstractCrudHandler
             return;
         }
 
-        try
+        Integer discoveryProfileId = body.getInteger(DISCOVERY_PROFILE_ID);
+
+        if (discoveryProfileId == null)
         {
-            Integer discoveryProfileId = body.getInteger(DISCOVERY_PROFILE_ID);
+            handleMissingData(ctx, LOGGER, MISSING_FIELDS);
 
-            if (discoveryProfileId == null)
-            {
-                handleMissingData(ctx, LOGGER, MISSING_FIELDS);
+            return;
+        }
 
-                return;
-            }
+        LOGGER.info("Fetching discovery profile with ID: " + discoveryProfileId);
 
-            LOGGER.info("Fetching discovery profile with ID: " + discoveryProfileId);
+        executeQuery(GET_DISCOVERY_BY_ID, List.of(discoveryProfileId))
+                .onSuccess(result ->
+                {
+                    JsonArray rows = result.getJsonArray("rows");
 
-            DATABASE_CLIENT
-                    .preparedQuery(GET_DISCOVERY_BY_ID)
-                    .execute(Tuple.of(discoveryProfileId), fetchRes ->
+                    if (rows == null || rows.isEmpty())
                     {
-                        if (fetchRes.failed())
-                        {
-                            handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, fetchRes.cause());
+                        handleNotFound(ctx, LOGGER);
 
-                            return;
-                        }
+                        return;
+                    }
 
-                        RowSet<Row> rows = fetchRes.result();
+                    JsonObject discoveryProfile = rows.getJsonObject(0);
 
-                        if (!rows.iterator().hasNext())
-                        {
-                            handleNotFound(ctx, LOGGER);
+                    String status = discoveryProfile.getString(STATUS);
 
-                            return;
-                        }
+                    if (!ACTIVE.equalsIgnoreCase(status))
+                    {
+                        handleInvalidData(ctx, LOGGER, DEVICE_NOT_DISCOVERED);
 
-                        Row row = rows.iterator().next();
+                        return;
+                    }
 
-                        String status = row.getString(STATUS);
+                    String name = discoveryProfile.getString(NAME);
 
-                        if (!"active".equalsIgnoreCase(status))
-                        {
-                            handleInvalidData(ctx, LOGGER, DEVICE_NOT_DISCOVERED);
+                    String ip = discoveryProfile.getString(IP);
 
-                            return;
-                        }
+                    Integer port = discoveryProfile.getInteger(PORT);
 
-                        String name = row.getString(NAME);
+                    Integer credentialProfileId = discoveryProfile.getInteger(CREDENTIAL_PROFILE_ID);
 
-                        String ip = row.getString(IP);
+                    LOGGER.info("Inserting provisioned device copied from discovery profile ID: " + discoveryProfileId);
 
-                        Integer port = row.getInteger(PORT);
+                    executeQuery(ADD_PROVISION, List.of(name, ip, port, credentialProfileId))
+                            .onSuccess(insertResult ->
+                            {
+                                JsonArray insertRows = insertResult.getJsonArray("rows");
 
-                        Integer credentialProfileId = row.getInteger(CREDENTIAL_PROFILE_ID);
-
-                        LOGGER.info("Inserting provisioned device copied from discovery profile ID: " + discoveryProfileId);
-
-                        DATABASE_CLIENT
-                                .preparedQuery(ADD_PROVISION)
-                                .execute(Tuple.of(name, ip, port, credentialProfileId), insertRes ->
+                                if (insertRows != null && !insertRows.isEmpty())
                                 {
-                                    if (insertRes.succeeded())
-                                    {
-                                        int id = insertRes.result().iterator().next().getInteger(ID);
+                                    int id = insertRows.getJsonObject(0).getInteger(ID);
 
-                                        LOGGER.info("Provisioned device added with ID: " + id);
+                                    LOGGER.info("Provisioned device added with ID: " + id);
 
-                                        handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
-                                    }
-                                    else
-                                    {
-                                        handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, insertRes.cause());
-                                    }
-                                });
-
-                    });
-
-        }
-        catch (Exception e)
-        {
-            LOGGER.warning("Exception in add(): " + e.getMessage());
-
-            handleInvalidData(ctx, LOGGER, INVALID_JSON_BODY);
-        }
+                                    handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
+                                }
+                                else
+                                {
+                                    handleSuccess(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS));
+                                }
+                            })
+                            .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, cause));
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
-
 
     @Override
     public void list(RoutingContext ctx)
     {
         LOGGER.info("Fetching provisioned device list");
 
-        DATABASE_CLIENT
-                .preparedQuery(GET_ALL_PROVISIONS)
-                .execute(databaseResponse ->
+        executeQuery(GET_ALL_PROVISIONS)
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
+                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+
+                    JsonArray provisionList = new JsonArray();
+
+                    for (int i = 0; i < rows.size(); i++)
                     {
-                        JsonArray provisionList = new JsonArray();
+                        JsonObject row = rows.getJsonObject(i);
 
-                        for (Row row : databaseResponse.result())
-                        {
-                            JsonObject provision = new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put(NAME, row.getString(NAME))
-                                    .put(IP, row.getString(IP))
-                                    .put(PORT, row.getInteger(PORT))
-                                    .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID));
+                        JsonObject provision = new JsonObject()
+                                .put(ID, row.getInteger(ID))
+                                .put(NAME, row.getString(NAME))
+                                .put(IP, row.getString(IP))
+                                .put(PORT, row.getInteger(PORT))
+                                .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
+                                .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
 
-                            JsonArray pollingResults = row.getJsonArray("polling_results");
-
-                            provision.put("polling_results", pollingResults);
-
-                            provisionList.add(provision);
-                        }
-
-                        LOGGER.info("Fetched " + provisionList.size() + " provisioned devices");
-
-                        handleSuccess(ctx, new JsonObject().put("provisions", provisionList));
+                        provisionList.add(provision);
                     }
-                    else
-                    {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, databaseResponse.cause());
-                    }
-                });
+
+                    LOGGER.info("Fetched " + provisionList.size() + " provisioned devices");
+
+                    handleSuccess(ctx, new JsonObject().put("provisions", provisionList));
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
-
 
     @Override
     public void getById(RoutingContext ctx)
@@ -185,43 +154,33 @@ public class ProvisionHandler extends AbstractCrudHandler
 
         LOGGER.info("Fetching provisioned device with ID: " + id);
 
-        DATABASE_CLIENT
-                .preparedQuery(GET_PROVISION_BY_ID)
-                .execute(Tuple.of(id), databaseResponse ->
+        executeQuery(GET_PROVISION_BY_ID, List.of(id))
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
+                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+
+                    if (rows.isEmpty())
                     {
-                        RowSet<Row> result = databaseResponse.result();
-
-                        if (result.size() == 0)
-                        {
-                            handleNotFound(ctx, LOGGER);
-                        }
-                        else
-                        {
-                            Row row = result.iterator().next();
-
-                            JsonObject provision = new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put(NAME, row.getString(NAME))
-                                    .put(IP, row.getString(IP))
-                                    .put(PORT, row.getInteger(PORT))
-                                    .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID));
-
-                            JsonArray pollingResults = row.getJsonArray("polling_results");
-
-                            provision.put("polling_results", pollingResults);
-
-                            handleSuccess(ctx, provision);
-                        }
+                        handleNotFound(ctx, LOGGER);
                     }
                     else
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, databaseResponse.cause());
-                    }
-                });
+                        JsonObject row = rows.getJsonObject(0);
 
+                        JsonObject provision = new JsonObject()
+                                .put(ID, row.getInteger(ID))
+                                .put(NAME, row.getString(NAME))
+                                .put(IP, row.getString(IP))
+                                .put(PORT, row.getInteger(PORT))
+                                .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
+                                .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
+
+                        handleSuccess(ctx, provision);
+                    }
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
+
 
 
     @Override
@@ -239,28 +198,23 @@ public class ProvisionHandler extends AbstractCrudHandler
 
         LOGGER.info("Deleting provisioned device with ID: " + id);
 
-        DATABASE_CLIENT
-                .preparedQuery(DELETE_PROVISION)
-                .execute(Tuple.of(id), databaseResponse ->
+        executeQuery(DELETE_PROVISION, List.of(id))
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
-                    {
-                        if (databaseResponse.result().rowCount() == 0)
-                        {
-                            handleNotFound(ctx, LOGGER);
-                        }
-                        else
-                        {
-                            LOGGER.info("Provisioned device deleted with ID: " + id);
+                    int rowCount = result.getInteger("rowCount", 0);
 
-                            handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
-                        }
+                    if (rowCount == 0)
+                    {
+                        handleNotFound(ctx, LOGGER);
                     }
                     else
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, databaseResponse.cause());
+                        LOGGER.info("Provisioned device deleted with ID: " + id);
+
+                        handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                     }
-                });
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, cause));
     }
 
     public void startPolling(RoutingContext ctx)

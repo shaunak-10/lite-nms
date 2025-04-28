@@ -3,6 +3,7 @@ package org.example;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import org.example.db.DatabaseClient;
+import org.example.db.DatabaseVerticle;
 import org.example.verticles.HttpServerVerticle;
 import org.example.plugin.PluginVerticle;
 import org.example.scheduler.SchedulerVerticle;
@@ -44,7 +45,13 @@ public class MainApp
     {
         final List<String> deployedIds = new ArrayList<>();
 
-        return vertx.deployVerticle(PluginVerticle.class.getName())
+        return vertx.deployVerticle(DatabaseVerticle.class.getName())
+                .compose(dbId ->
+                {
+                    deployedIds.add(dbId);
+
+                    return vertx.deployVerticle(PluginVerticle.class.getName());
+                })
                 .compose(pluginId ->
                 {
                     deployedIds.add(pluginId);
@@ -62,7 +69,6 @@ public class MainApp
                     deployedIds.add(httpId);
 
                     return Future.succeededFuture();
-
                 })
                 .recover(error ->
                 {

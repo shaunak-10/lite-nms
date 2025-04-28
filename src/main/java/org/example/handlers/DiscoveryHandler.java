@@ -3,11 +3,6 @@ package org.example.handlers;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.sqlclient.Row;
-import io.vertx.sqlclient.RowSet;
-import io.vertx.sqlclient.SqlClient;
-import io.vertx.sqlclient.Tuple;
-import org.example.db.DatabaseClient;
 import org.example.plugin.PluginService;
 import org.example.plugin.PluginVerticle;
 import org.example.utils.*;
@@ -27,12 +22,9 @@ import static org.example.constants.AppConstants.Message.*;
 
 public class DiscoveryHandler extends AbstractCrudHandler
 {
-
     private static final DiscoveryHandler INSTANCE = new DiscoveryHandler();
 
     private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
-
-    private static final SqlClient DATABASE_CLIENT = DatabaseClient.getClient();
 
     private DiscoveryHandler() {}
 
@@ -60,8 +52,6 @@ public class DiscoveryHandler extends AbstractCrudHandler
             String ip = body.getString(IP);
 
             int port = body.getInteger(PORT, 22);
-
-            String status = body.getString(STATUS, "inactive");
 
             int credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
 
@@ -91,13 +81,14 @@ public class DiscoveryHandler extends AbstractCrudHandler
                             return;
                         }
 
-                        DATABASE_CLIENT
-                                .preparedQuery(ADD_DISCOVERY)
-                                .execute(Tuple.of(name, validIp, port, status, credentialProfileId), databaseResponse ->
+                        executeQuery(ADD_DISCOVERY, List.of(name, validIp, port, INACTIVE, credentialProfileId))
+                                .onSuccess(result ->
                                 {
-                                    if (databaseResponse.succeeded())
+                                    JsonArray rows = result.getJsonArray("rows");
+
+                                    if (rows != null && !rows.isEmpty())
                                     {
-                                        int id = databaseResponse.result().iterator().next().getInteger(ID);
+                                        int id = rows.getJsonObject(0).getInteger(ID);
 
                                         LOGGER.info("Discovery profile added with ID: " + id);
 
@@ -105,9 +96,10 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                     }
                                     else
                                     {
-                                        handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, databaseResponse.cause());
+                                        handleSuccess(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS));
                                     }
-                                });
+                                })
+                                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, cause));
                     })
                     .onFailure(err ->
                     {
@@ -129,34 +121,31 @@ public class DiscoveryHandler extends AbstractCrudHandler
     {
         LOGGER.info("Fetching discovery profile list");
 
-        DATABASE_CLIENT
-                .preparedQuery(GET_ALL_DISCOVERY)
-                .execute(databaseResponse ->
+        executeQuery(GET_ALL_DISCOVERY)
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
+                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+
+                    JsonArray discoveryList = new JsonArray();
+
+                    for (int i = 0; i < rows.size(); i++)
                     {
-                        JsonArray discoveryList = new JsonArray();
+                        JsonObject row = rows.getJsonObject(i);
 
-                        for (Row row : databaseResponse.result())
-                        {
-                            discoveryList.add(new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put(NAME, row.getString(NAME))
-                                    .put(IP, row.getString(IP))
-                                    .put(PORT, row.getInteger(PORT))
-                                    .put(STATUS, row.getString(STATUS))
-                                    .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
-                        }
-
-                        LOGGER.info("Fetched " + discoveryList.size() + " discovery profiles");
-
-                        handleSuccess(ctx, new JsonObject().put(DISCOVERIES, discoveryList));
+                        discoveryList.add(new JsonObject()
+                                .put(ID, row.getInteger(ID))
+                                .put(NAME, row.getString(NAME))
+                                .put(IP, row.getString(IP))
+                                .put(PORT, row.getInteger(PORT))
+                                .put(STATUS, row.getString(STATUS))
+                                .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
                     }
-                    else
-                    {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, databaseResponse.cause());
-                    }
-                });
+
+                    LOGGER.info("Fetched " + discoveryList.size() + " discovery profiles");
+
+                    handleSuccess(ctx, new JsonObject().put(DISCOVERIES, discoveryList));
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
 
     @Override
@@ -168,36 +157,29 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
         LOGGER.info("Fetching discovery profile with ID: " + id);
 
-        DATABASE_CLIENT
-                .preparedQuery(GET_DISCOVERY_BY_ID)
-                .execute(Tuple.of(id), databaseResponse ->
+        executeQuery(GET_DISCOVERY_BY_ID, List.of(id))
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
+                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+
+                    if (rows.isEmpty())
                     {
-                        RowSet<Row> result = databaseResponse.result();
-
-                        if (result.size() == 0)
-                        {
-                            handleNotFound(ctx, LOGGER);
-                        }
-                        else
-                        {
-                            Row row = result.iterator().next();
-
-                            handleSuccess(ctx, new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put(NAME, row.getString(NAME))
-                                    .put(IP, row.getString(IP))
-                                    .put(PORT, row.getInteger(PORT))
-                                    .put(STATUS, row.getString(STATUS))
-                                    .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
-                        }
+                        handleNotFound(ctx, LOGGER);
                     }
                     else
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, databaseResponse.cause());
+                        JsonObject row = rows.getJsonObject(0);
+
+                        handleSuccess(ctx, new JsonObject()
+                                .put(ID, row.getInteger(ID))
+                                .put(NAME, row.getString(NAME))
+                                .put(IP, row.getString(IP))
+                                .put(PORT, row.getInteger(PORT))
+                                .put(STATUS, row.getString(STATUS))
+                                .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
                     }
-                });
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
 
     public void update(RoutingContext ctx)
@@ -251,28 +233,23 @@ public class DiscoveryHandler extends AbstractCrudHandler
                             return;
                         }
 
-                        DATABASE_CLIENT
-                                .preparedQuery(UPDATE_DISCOVERY)
-                                .execute(Tuple.of(name, validIp, port, credentialProfileId, id), updateRes ->
+                        executeQuery(UPDATE_DISCOVERY, List.of(name, validIp, port, credentialProfileId, id))
+                                .onSuccess(result ->
                                 {
-                                    if (updateRes.succeeded())
-                                    {
-                                        if (updateRes.result().rowCount() == 0)
-                                        {
-                                            handleNotFound(ctx, LOGGER);
-                                        }
-                                        else
-                                        {
-                                            LOGGER.info("Discovery profile updated successfully for ID " + id);
+                                    int rowCount = result.getInteger("rowCount", 0);
 
-                                            handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
-                                        }
+                                    if (rowCount == 0)
+                                    {
+                                        handleNotFound(ctx, LOGGER);
                                     }
                                     else
                                     {
-                                        handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, updateRes.cause());
+                                        LOGGER.info("Discovery profile updated successfully for ID " + id);
+
+                                        handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
                                     }
-                                });
+                                })
+                                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, cause));
                     })
                     .onFailure(err ->
                     {
@@ -297,53 +274,44 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
         LOGGER.info("Deleting discovery profile ID: " + id);
 
-        DATABASE_CLIENT
-                .preparedQuery(DELETE_DISCOVERY)
-                .execute(Tuple.of(id), databaseResponse ->
+        executeQuery(DELETE_DISCOVERY, List.of(id))
+                .onSuccess(result ->
                 {
-                    if (databaseResponse.succeeded())
-                    {
-                        if (databaseResponse.result().rowCount() == 0)
-                        {
-                            handleNotFound(ctx, LOGGER);
-                        }
-                        else
-                        {
-                            LOGGER.info("Discovery profile deleted for ID: " + id);
+                    int rowCount = result.getInteger("rowCount", 0);
 
-                            handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
-                        }
+                    if (rowCount == 0)
+                    {
+                        handleNotFound(ctx, LOGGER);
                     }
                     else
                     {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, databaseResponse.cause());
+                        LOGGER.info("Discovery profile deleted for ID: " + id);
+
+                        handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                     }
-                });
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, cause));
     }
 
     public void runDiscovery(RoutingContext ctx)
     {
         LOGGER.info("Starting discovery run for all devices");
 
-        DATABASE_CLIENT
-                .preparedQuery(DATA_TO_PLUGIN_FOR_DISCOVERY)
-                .execute(dbRes ->
+        executeQuery(DATA_TO_PLUGIN_FOR_DISCOVERY)
+                .onSuccess(dbRes ->
                 {
-                    if (dbRes.failed())
-                    {
-                        handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, dbRes.cause());
-
-                        return;
-                    }
+                    JsonArray rows = dbRes.getJsonArray("rows", new JsonArray());
 
                     JsonArray devices = new JsonArray();
 
                     JsonArray defaultResults = new JsonArray();
 
-                    for (Row row : dbRes.result())
+                    for (int i = 0; i < rows.size(); i++)
                     {
                         try
                         {
+                            JsonObject row = rows.getJsonObject(i);
+
                             JsonObject device = new JsonObject()
                                     .put(ID, row.getInteger(ID))
                                     .put(PORT, row.getInteger(PORT))
@@ -353,7 +321,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                             devices.add(device);
 
-                            defaultResults.add(new JsonObject().put(ID, row.getInteger(ID)).put("reachable", false));
+                            defaultResults.add(new JsonObject()
+                                    .put(ID, row.getInteger(ID))
+                                    .put("reachable", false));
                         }
                         catch (Exception e)
                         {
@@ -361,106 +331,122 @@ public class DiscoveryHandler extends AbstractCrudHandler
                         }
                     }
 
-                    if (handleIfEmpty(ctx, devices)) return;
+                    if(handleIfEmpty(ctx,devices)) return;
 
-                    PingUtil.filterReachableDevicesAsync(ctx.vertx(), devices).onComplete(pingRes ->
+                    startDiscoveryPipeline(ctx, devices, defaultResults);
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+    }
+
+    private void startDiscoveryPipeline(RoutingContext ctx, JsonArray devices, JsonArray defaultResults)
+    {
+        PingUtil.filterReachableDevicesAsync(ctx.vertx(), devices)
+                .onFailure(cause -> ctx.fail(500, cause))
+                .onSuccess(pingedDevices ->
+                {
+
+                    if (pingedDevices.isEmpty())
                     {
-                        if (pingRes.failed())
-                        {
-                            ctx.fail(500, pingRes.cause());
+                        LOGGER.info("All devices lost after ping. Marking all as inactive.");
 
-                            return;
-                        }
+                        updateDiscoveryStatus(ctx, defaultResults);
 
-                        JsonArray pingedDevices = pingRes.result();
+                        return;
+                    }
 
-                        if (handleIfEmpty(ctx, pingedDevices)) return;
-
-                        PortUtil.filterReachableDevicesAsync(ctx.vertx(), pingedDevices).onComplete(portRes ->
-                        {
-                            if (portRes.failed())
+                    PortUtil.filterReachableDevicesAsync(ctx.vertx(), pingedDevices)
+                            .onFailure(cause -> ctx.fail(500, cause))
+                            .onSuccess(portFilteredDevices ->
                             {
-                                ctx.fail(500, portRes.cause());
 
-                                return;
-                            }
+                                if (portFilteredDevices.isEmpty())
+                                {
+                                    LOGGER.info("All devices lost after port check. Marking all as inactive.");
 
-                            JsonArray finalDevices = portRes.result();
+                                    updateDiscoveryStatus(ctx, defaultResults);
 
-                            if (handleIfEmpty(ctx, finalDevices)) return;
+                                    return;
+                                }
 
-                            PluginService pluginService = PluginService.createProxy(ctx.vertx(), PluginVerticle.SERVICE_ADDRESS);
+                                PluginService pluginService = PluginService.createProxy(ctx.vertx(), PluginVerticle.SERVICE_ADDRESS);
 
-                            pluginService.runSSHReachability(finalDevices)
-                                    .onSuccess(sshResults ->
-                                    {
-                                        Map<Integer, Boolean> sshReachabilityMap = new HashMap<>();
-
-                                        for (int i = 0; i < sshResults.size(); i++)
+                                pluginService.runSSHReachability(portFilteredDevices)
+                                        .onFailure(err ->
                                         {
-                                            JsonObject pluginResult = sshResults.getJsonObject(i);
+                                            LOGGER.warning("SSH plugin call failed: " + err.getMessage());
 
-                                            sshReachabilityMap.put(pluginResult.getInteger(ID), pluginResult.getBoolean("reachable"));
-                                        }
-
-                                        for (int i = 0; i < defaultResults.size(); i++)
+                                            ctx.response()
+                                                    .setStatusCode(500)
+                                                    .end(new JsonObject().put(ERROR, PLUGIN_EXECUTION_FAILED).encode());
+                                        })
+                                        .onSuccess(sshResults ->
                                         {
-                                            JsonObject deviceResult = defaultResults.getJsonObject(i);
 
-                                            int id = deviceResult.getInteger(ID);
+                                            Map<Integer, Boolean> sshReachabilityMap = new HashMap<>();
 
-                                            if (sshReachabilityMap.containsKey(id))
+                                            for (int i = 0; i < sshResults.size(); i++)
                                             {
-                                                deviceResult.put("reachable", sshReachabilityMap.get(id));
+                                                JsonObject pluginResult = sshResults.getJsonObject(i);
+
+                                                sshReachabilityMap.put(pluginResult.getInteger(ID), pluginResult.getBoolean("reachable"));
                                             }
-                                        }
 
-                                        LOGGER.info("Discovery completed with " + defaultResults.size() + " results");
+                                            for (int i = 0; i < defaultResults.size(); i++)
+                                            {
+                                                JsonObject deviceResult = defaultResults.getJsonObject(i);
 
-                                        List<Tuple> batchParams = new ArrayList<>();
+                                                int id = deviceResult.getInteger(ID);
 
-                                        for (int i = 0; i < defaultResults.size(); i++)
-                                        {
-                                            JsonObject result = defaultResults.getJsonObject(i);
-
-                                            int id = result.getInteger(ID);
-
-                                            boolean reachable = result.getBoolean("reachable");
-
-                                            String status = reachable ? ACTIVE : INACTIVE;
-
-                                            batchParams.add(Tuple.of(status, id));
-                                        }
-
-                                        DATABASE_CLIENT
-                                                .preparedQuery(UPDATE_DISCOVERY_STATUS)
-                                                .executeBatch(batchParams)
-                                                .onSuccess(res ->
+                                                if (sshReachabilityMap.containsKey(id))
                                                 {
-                                                    LOGGER.info("Batch status update successful for " + defaultResults.size() + " devices.");
+                                                    deviceResult.put("reachable", sshReachabilityMap.get(id));
+                                                }
+                                            }
 
-                                                    ctx.json(new JsonObject().put("results", defaultResults));
-                                                })
-                                                .onFailure(err ->
-                                                {
-                                                    LOGGER.warning("Batch update failed: " + err.getMessage());
+                                            LOGGER.info("Discovery completed. Updating status for " + defaultResults.size() + " devices.");
 
-                                                    ctx.response().setStatusCode(500)
-                                                            .end(new JsonObject().put(ERROR, "Status update failed").encode());
-                                                });
+                                            updateDiscoveryStatus(ctx, defaultResults);
+                                        });
+                            });
+                });
+    }
 
-                                    })
-                                    .onFailure(err ->
-                                    {
-                                        LOGGER.warning("SSH plugin call failed: " + err.getMessage());
+    private void updateDiscoveryStatus(RoutingContext ctx, JsonArray defaultResults)
+    {
+        List<List<Object>> batchParams = new ArrayList<>();
 
-                                        ctx.response()
-                                                .setStatusCode(500)
-                                                .end(new JsonObject().put(ERROR, PLUGIN_EXECUTION_FAILED).encode());
-                                    });
+        for (int i = 0; i < defaultResults.size(); i++)
+        {
+            JsonObject result = defaultResults.getJsonObject(i);
 
-                        });
-                    });
+            int id = result.getInteger(ID);
+
+            boolean reachable = result.getBoolean("reachable");
+
+            String status = reachable ? ACTIVE : INACTIVE;
+
+            List<Object> paramSet = new ArrayList<>();
+
+            paramSet.add(status);
+
+            paramSet.add(id);
+
+            batchParams.add(paramSet);
+        }
+
+        executeBatch(UPDATE_DISCOVERY_STATUS, batchParams)
+                .onSuccess(res ->
+                {
+                    LOGGER.info("Batch status update successful for " + defaultResults.size() + " devices.");
+
+                    ctx.json(new JsonObject().put("results", defaultResults));
+                })
+                .onFailure(err ->
+                {
+                    LOGGER.warning("Batch update failed: " + err.getMessage());
+
+                    ctx.response().setStatusCode(500)
+                            .end(new JsonObject().put(ERROR, "Status update failed").encode());
                 });
     }
 
@@ -479,5 +465,4 @@ public class DiscoveryHandler extends AbstractCrudHandler
         }
         return false;
     }
-
 }

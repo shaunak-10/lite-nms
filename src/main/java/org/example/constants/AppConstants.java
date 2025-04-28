@@ -111,6 +111,8 @@ public class AppConstants {
         public static final String SSH_METRICS = "plugin.ssh.metrics";
         public static final String POLLING_START = "scheduler.polling.start";
         public static final String POLLING_STOP = "scheduler.polling.stop";
+        public static final String DATABASE_SERVICE = "execute.database.query";
+        public static final String DATABASE_SERVICE_BATCH = "execute.database.batch";
         public static final String PLUGIN_PATH = "/home/shaunak/IdeaProjects/http-server/src/main/java/org/example/plugin_executable/ssh-plugin";
     }
 }
