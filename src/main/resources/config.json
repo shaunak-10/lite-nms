@@ -1,0 +1,14 @@
+{
+  "ping": {
+    "count": 3,
+    "timeout": 2,
+    "interval": 0.5
+  },
+  "port": {
+    "timeout": 1
+  },
+  "process": {
+    "timeout": 4
+  },
+  "polling-interval": 10000
+}

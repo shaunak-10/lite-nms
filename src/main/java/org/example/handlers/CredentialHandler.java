@@ -14,15 +14,15 @@ import static org.example.constants.AppConstants.CredentialField.*;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
 
-public class CredentialHandler extends AbstractCrudHandler {
-
+public class CredentialHandler extends AbstractCrudHandler
+{
     private static final Logger LOGGER = LoggerUtil.getMainLogger();
 
     private static final CredentialHandler INSTANCE = new CredentialHandler();
 
     private CredentialHandler() {}
 
-    public static synchronized CredentialHandler getInstance()
+    public static CredentialHandler getInstance()
     {
         return INSTANCE;
     }
@@ -30,17 +30,17 @@ public class CredentialHandler extends AbstractCrudHandler {
     @Override
     public void add(RoutingContext ctx)
     {
-        JsonObject body = ctx.body().asJsonObject();
+        var body = ctx.body().asJsonObject();
 
         if (notValidateCredentialFields(ctx, body)) return;
 
         LOGGER.info("Adding new credential: " + body.encode());
 
-        String name = body.getString(NAME);
+        var name = body.getString(NAME);
 
-        String username = body.getString(USERNAME);
+        var username = body.getString(USERNAME);
 
-        String password = body.getString(PASSWORD);
+        var password = body.getString(PASSWORD);
 
         try
         {
@@ -54,11 +54,11 @@ public class CredentialHandler extends AbstractCrudHandler {
         executeQuery(ADD_CREDENTIAL, List.of(name, username, password))
                 .onSuccess(result ->
                 {
-                    JsonArray rows = result.getJsonArray("rows");
+                    var rows = result.getJsonArray("rows");
 
                     if (rows != null && !rows.isEmpty())
                     {
-                        int id = rows.getJsonObject(0).getInteger(ID);
+                        var id = rows.getJsonObject(0).getInteger(ID);
 
                         LOGGER.info("Credential added with ID: " + id);
 
@@ -80,13 +80,13 @@ public class CredentialHandler extends AbstractCrudHandler {
         executeQuery(GET_ALL_CREDENTIALS)
                 .onSuccess(result ->
                 {
-                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+                    var rows = result.getJsonArray("rows", new JsonArray());
 
-                    JsonArray credentialList = new JsonArray();
+                    var credentialList = new JsonArray();
 
-                    for (int i = 0; i < rows.size(); i++)
+                    for (var i = 0; i < rows.size(); i++)
                     {
-                        JsonObject row = rows.getJsonObject(i);
+                        var row = rows.getJsonObject(i);
 
                         credentialList.add(new JsonObject()
                                 .put(ID, row.getInteger(ID))
@@ -104,7 +104,7 @@ public class CredentialHandler extends AbstractCrudHandler {
     @Override
     public void getById(RoutingContext ctx)
     {
-        int id = validateIdFromPath(ctx);
+        var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
 
@@ -113,7 +113,7 @@ public class CredentialHandler extends AbstractCrudHandler {
         executeQuery(GET_CREDENTIAL_BY_ID, List.of(id))
                 .onSuccess(result ->
                 {
-                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+                    var rows = result.getJsonArray("rows", new JsonArray());
 
                     if (rows.isEmpty())
                     {
@@ -121,7 +121,7 @@ public class CredentialHandler extends AbstractCrudHandler {
                     }
                     else
                     {
-                        JsonObject row = rows.getJsonObject(0);
+                        var row = rows.getJsonObject(0);
 
                         handleSuccess(ctx, new JsonObject()
                                 .put(ID, row.getInteger(ID))
@@ -135,19 +135,19 @@ public class CredentialHandler extends AbstractCrudHandler {
     @Override
     public void update(RoutingContext ctx)
     {
-        int id = validateIdFromPath(ctx);
+        var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
 
-        JsonObject body = ctx.body().asJsonObject();
+        var body = ctx.body().asJsonObject();
 
         if (notValidateCredentialFields(ctx, body)) return;
 
-        String name = body.getString(NAME);
+        var name = body.getString(NAME);
 
-        String username = body.getString(USERNAME);
+        var username = body.getString(USERNAME);
 
-        String password = body.getString(PASSWORD);
+        var password = body.getString(PASSWORD);
 
         try
         {
@@ -163,7 +163,7 @@ public class CredentialHandler extends AbstractCrudHandler {
         executeQuery(UPDATE_CREDENTIAL, List.of(name, username, password, id))
                 .onSuccess(result ->
                 {
-                    int rowCount = result.getInteger("rowCount", 0);
+                    var rowCount = result.getInteger("rowCount", 0);
 
                     if (rowCount == 0)
                     {
@@ -182,7 +182,7 @@ public class CredentialHandler extends AbstractCrudHandler {
     @Override
     public void delete(RoutingContext ctx)
     {
-        int id = validateIdFromPath(ctx);
+        var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
 
@@ -191,7 +191,7 @@ public class CredentialHandler extends AbstractCrudHandler {
         executeQuery(DELETE_CREDENTIAL, List.of(id))
                 .onSuccess(result ->
                 {
-                    int rowCount = result.getInteger("rowCount", 0);
+                    var rowCount = result.getInteger("rowCount", 0);
 
                     if (rowCount == 0)
                     {
@@ -216,11 +216,11 @@ public class CredentialHandler extends AbstractCrudHandler {
             return true;
         }
 
-        String name = body.getString(NAME);
+        var name = body.getString(NAME);
 
-        String username = body.getString(USERNAME);
+        var username = body.getString(USERNAME);
 
-        String password = body.getString(PASSWORD);
+        var password = body.getString(PASSWORD);
 
         if (name == null || username == null || password == null)
         {

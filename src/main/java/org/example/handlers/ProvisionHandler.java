@@ -10,10 +10,6 @@ import static org.example.constants.AppConstants.ProvisionQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
-import static org.example.constants.AppConstants.Headers.*;
-
-import org.example.scheduler.SchedulerService;
-import org.example.scheduler.SchedulerVerticle;
 import org.example.utils.LoggerUtil;
 
 import java.util.List;
@@ -35,7 +31,7 @@ public class ProvisionHandler extends AbstractCrudHandler
     @Override
     public void add(RoutingContext ctx)
     {
-        JsonObject body = ctx.body().asJsonObject();
+        var body = ctx.body().asJsonObject();
 
         if (body == null)
         {
@@ -44,7 +40,7 @@ public class ProvisionHandler extends AbstractCrudHandler
             return;
         }
 
-        Integer discoveryProfileId = body.getInteger(DISCOVERY_PROFILE_ID);
+        var discoveryProfileId = body.getInteger(DISCOVERY_PROFILE_ID);
 
         if (discoveryProfileId == null)
         {
@@ -58,7 +54,7 @@ public class ProvisionHandler extends AbstractCrudHandler
         executeQuery(GET_DISCOVERY_BY_ID, List.of(discoveryProfileId))
                 .onSuccess(result ->
                 {
-                    JsonArray rows = result.getJsonArray("rows");
+                    var rows = result.getJsonArray("rows");
 
                     if (rows == null || rows.isEmpty())
                     {
@@ -67,9 +63,9 @@ public class ProvisionHandler extends AbstractCrudHandler
                         return;
                     }
 
-                    JsonObject discoveryProfile = rows.getJsonObject(0);
+                    var discoveryProfile = rows.getJsonObject(0);
 
-                    String status = discoveryProfile.getString(STATUS);
+                    var status = discoveryProfile.getString(STATUS);
 
                     if (!ACTIVE.equalsIgnoreCase(status))
                     {
@@ -78,24 +74,24 @@ public class ProvisionHandler extends AbstractCrudHandler
                         return;
                     }
 
-                    String name = discoveryProfile.getString(NAME);
+                    var name = discoveryProfile.getString(NAME);
 
-                    String ip = discoveryProfile.getString(IP);
+                    var ip = discoveryProfile.getString(IP);
 
-                    Integer port = discoveryProfile.getInteger(PORT);
+                    var port = discoveryProfile.getInteger(PORT);
 
-                    Integer credentialProfileId = discoveryProfile.getInteger(CREDENTIAL_PROFILE_ID);
+                    var credentialProfileId = discoveryProfile.getInteger(CREDENTIAL_PROFILE_ID);
 
                     LOGGER.info("Inserting provisioned device copied from discovery profile ID: " + discoveryProfileId);
 
                     executeQuery(ADD_PROVISION, List.of(name, ip, port, credentialProfileId))
                             .onSuccess(insertResult ->
                             {
-                                JsonArray insertRows = insertResult.getJsonArray("rows");
+                                var insertRows = insertResult.getJsonArray("rows");
 
                                 if (insertRows != null && !insertRows.isEmpty())
                                 {
-                                    int id = insertRows.getJsonObject(0).getInteger(ID);
+                                    var id = insertRows.getJsonObject(0).getInteger(ID);
 
                                     LOGGER.info("Provisioned device added with ID: " + id);
 
@@ -119,15 +115,15 @@ public class ProvisionHandler extends AbstractCrudHandler
         executeQuery(GET_ALL_PROVISIONS)
                 .onSuccess(result ->
                 {
-                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+                    var rows = result.getJsonArray("rows", new JsonArray());
 
-                    JsonArray provisionList = new JsonArray();
+                    var provisionList = new JsonArray();
 
-                    for (int i = 0; i < rows.size(); i++)
+                    for (var i = 0; i < rows.size(); i++)
                     {
-                        JsonObject row = rows.getJsonObject(i);
+                        var row = rows.getJsonObject(i);
 
-                        JsonObject provision = new JsonObject()
+                        var provision = new JsonObject()
                                 .put(ID, row.getInteger(ID))
                                 .put(NAME, row.getString(NAME))
                                 .put(IP, row.getString(IP))
@@ -148,7 +144,7 @@ public class ProvisionHandler extends AbstractCrudHandler
     @Override
     public void getById(RoutingContext ctx)
     {
-        int id = validateIdFromPath(ctx);
+        var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
 
@@ -157,7 +153,7 @@ public class ProvisionHandler extends AbstractCrudHandler
         executeQuery(GET_PROVISION_BY_ID, List.of(id))
                 .onSuccess(result ->
                 {
-                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+                    var rows = result.getJsonArray("rows", new JsonArray());
 
                     if (rows.isEmpty())
                     {
@@ -165,9 +161,9 @@ public class ProvisionHandler extends AbstractCrudHandler
                     }
                     else
                     {
-                        JsonObject row = rows.getJsonObject(0);
+                        var row = rows.getJsonObject(0);
 
-                        JsonObject provision = new JsonObject()
+                        var provision = new JsonObject()
                                 .put(ID, row.getInteger(ID))
                                 .put(NAME, row.getString(NAME))
                                 .put(IP, row.getString(IP))
@@ -192,7 +188,7 @@ public class ProvisionHandler extends AbstractCrudHandler
     @Override
     public void delete(RoutingContext ctx)
     {
-        int id = validateIdFromPath(ctx);
+        var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
 
@@ -201,7 +197,7 @@ public class ProvisionHandler extends AbstractCrudHandler
         executeQuery(DELETE_PROVISION, List.of(id))
                 .onSuccess(result ->
                 {
-                    int rowCount = result.getInteger("rowCount", 0);
+                    var rowCount = result.getInteger("rowCount", 0);
 
                     if (rowCount == 0)
                     {
@@ -216,50 +212,4 @@ public class ProvisionHandler extends AbstractCrudHandler
                 })
                 .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, cause));
     }
-
-    public void startPolling(RoutingContext ctx)
-    {
-        JsonObject body = ctx.body().asJsonObject();
-
-        int interval;
-
-        if(body == null)
-        {
-            interval = 60000;
-        }
-        else
-        {
-            interval = body.getInteger("interval");
-        }
-
-        SchedulerService schedulerService = SchedulerService.createProxy(ctx.vertx(), SchedulerVerticle.SERVICE_ADDRESS);
-
-        schedulerService.startPolling(interval)
-                .onSuccess(reply->
-                        ctx.response()
-                                .putHeader(CONTENT_TYPE,APPLICATION_JSON)
-                                .end(new JsonObject().put(MESSAGE,reply).encodePrettily()))
-                .onFailure(reply->
-                        ctx.response()
-                                .setStatusCode(400)
-                                .putHeader(CONTENT_TYPE,APPLICATION_JSON)
-                                .end(new JsonObject().put(ERROR,reply.getMessage()).encodePrettily()));
-    }
-
-    public void stopPolling(RoutingContext ctx)
-    {
-        SchedulerService schedulerService = SchedulerService.createProxy(ctx.vertx(), SchedulerVerticle.SERVICE_ADDRESS);
-
-        schedulerService.stopPolling()
-                .onSuccess(reply->
-                        ctx.response()
-                                .putHeader(CONTENT_TYPE,APPLICATION_JSON)
-                                .end(new JsonObject().put(MESSAGE,reply).encodePrettily()))
-                .onFailure(reply->
-                        ctx.response()
-                                .setStatusCode(400)
-                                .putHeader(CONTENT_TYPE,APPLICATION_JSON)
-                                .end(new JsonObject().put(ERROR,reply.getMessage()).encodePrettily()));
-    }
-
 }

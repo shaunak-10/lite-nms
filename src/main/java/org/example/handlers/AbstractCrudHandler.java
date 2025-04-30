@@ -33,7 +33,7 @@ public abstract class AbstractCrudHandler
 
     protected int validateIdFromPath(RoutingContext ctx)
     {
-        String idParam = ctx.pathParam("id");
+        var idParam = ctx.pathParam("id");
 
         if (idParam == null)
         {
@@ -131,7 +131,7 @@ public abstract class AbstractCrudHandler
 
     Future<JsonObject> executeQuery(String query, List<Object> params)
     {
-        JsonObject request = new JsonObject()
+        var request = new JsonObject()
                 .put("query", query);
 
         if (params != null && !params.isEmpty())
@@ -149,14 +149,14 @@ public abstract class AbstractCrudHandler
 
     public Future<JsonObject> executeBatch(String query, List<List<Object>> paramsList)
     {
-        JsonObject request = new JsonObject()
+        var request = new JsonObject()
                 .put("query", query);
 
-        JsonArray paramsArray = new JsonArray();
+        var paramsArray = new JsonArray();
 
-        for (List<Object> params : paramsList)
+        for (var params : paramsList)
         {
-            JsonArray paramArray = new JsonArray(params);
+            var paramArray = new JsonArray(params);
 
             paramsArray.add(paramArray);
         }

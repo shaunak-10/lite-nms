@@ -20,12 +20,10 @@ public class EncryptionUtil
 
     public static String encrypt(String plainText) throws Exception
     {
-        Cipher cipher = Cipher.getInstance("AES");
+        var cipher = Cipher.getInstance("AES");
 
         cipher.init(Cipher.ENCRYPT_MODE, KEY_SPEC);
 
-        byte[] encrypted = cipher.doFinal(plainText.getBytes());
-
-        return Base64.getEncoder().encodeToString(encrypted);
+        return Base64.getEncoder().encodeToString(cipher.doFinal(plainText.getBytes()));
     }
 }

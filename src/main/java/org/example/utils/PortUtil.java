@@ -6,12 +6,19 @@ import io.vertx.core.json.JsonArray;
 
 import java.util.Arrays;
 
-public class PortUtil
-{
+import static org.example.constants.AppConstants.DiscoveryField.IP;
+import static org.example.constants.AppConstants.PortConstants.*;
+
+public class PortUtil {
     public static Future<JsonArray> filterReachableDevicesAsync(Vertx vertx, JsonArray devices)
     {
+        var portConfig = ConfigLoader.get().getJsonObject(PORT);
+
         return ConnectivityUtil.filterReachableDevicesAsync(vertx, devices, device ->
-                Arrays.asList("nc", "-zv", "-w", "1", device.getString("ip"), String.valueOf(device.getInteger("port", 22)))
+                Arrays.asList(NC_COMMAND, ZERO_IO, TIMEOUT_OPTION, String.valueOf(portConfig.getInteger(TIMEOUT)),
+                        device.getString(IP),
+                        String.valueOf(device.getInteger(PORT, 22)))
         );
     }
 }
+

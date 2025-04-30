@@ -19,12 +19,10 @@ public class DecryptionUtil
 
     public static String decrypt(String encryptedText) throws Exception
     {
-        Cipher cipher = Cipher.getInstance("AES");
+        var cipher = Cipher.getInstance("AES");
 
         cipher.init(Cipher.DECRYPT_MODE, KEY_SPEC);
 
-        byte[] decrypted = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
-
-        return new String(decrypted);
+        return new String(cipher.doFinal(Base64.getDecoder().decode(encryptedText)));
     }
 }

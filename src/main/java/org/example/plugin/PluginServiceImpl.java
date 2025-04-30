@@ -4,16 +4,19 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import java.io.*;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 import static org.example.constants.AppConstants.AddressesAndPaths.PLUGIN_PATH;
+import static org.example.constants.AppConstants.ConfigKeys.PROCESS;
+import static org.example.constants.AppConstants.PingConstants.TIMEOUT;
 
 import org.example.MainApp;
+import org.example.utils.ConfigLoader;
 import org.example.utils.LoggerUtil;
 
 public class PluginServiceImpl implements PluginService
 {
-
     private static final Logger LOGGER = LoggerUtil.getPluginLogger();
 
     private final Vertx vertx;
@@ -37,26 +40,28 @@ public class PluginServiceImpl implements PluginService
 
     private Future<JsonArray> executePlugin(JsonArray devices, String command)
     {
+        var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
+
         return vertx.executeBlocking(() ->
         {
             Process process = null;
 
             try
             {
-                ProcessBuilder pb = new ProcessBuilder(PLUGIN_PATH, command);
+                var pb = new ProcessBuilder(PLUGIN_PATH, command);
 
                 process = pb.start();
 
-                try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream())))
+                try (var writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream())))
                 {
                     writer.write(devices.encode());
 
                     writer.flush();
                 }
 
-                StringBuilder output = new StringBuilder();
+                var output = new StringBuilder();
 
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
+                try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
                 {
                     String line;
 
@@ -66,7 +71,7 @@ public class PluginServiceImpl implements PluginService
                     }
                 }
 
-                int exitCode = process.waitFor();
+                var exitCode = process.waitFor(timeout, TimeUnit.SECONDS) ? process.exitValue() : -1;
 
                 if (exitCode == 0)
                 {
@@ -74,9 +79,9 @@ public class PluginServiceImpl implements PluginService
                 }
                 else
                 {
-                    StringBuilder errorOutput = new StringBuilder();
+                    var errorOutput = new StringBuilder();
 
-                    try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream())))
+                    try (var errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream())))
                     {
                         String errLine;
 
@@ -86,7 +91,7 @@ public class PluginServiceImpl implements PluginService
                         }
                     }
 
-                    String errorMsg = "Plugin error (exit code " + exitCode + "): " + errorOutput;
+                    var errorMsg = "Plugin error (exit code " + exitCode + "): " + errorOutput;
 
                     LOGGER.severe(errorMsg);
 

@@ -4,26 +4,31 @@ import io.vertx.core.*;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+
+import static org.example.constants.AppConstants.ConfigKeys.PROCESS;
+import static org.example.constants.AppConstants.PingConstants.TIMEOUT;
 
 public class ConnectivityUtil
 {
     public static Future<JsonArray> filterReachableDevicesAsync(Vertx vertx, JsonArray devices, Function<JsonObject, List<String>> commandProvider)
     {
-        List<Future> futures = new ArrayList<>();
+        var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
 
-        List<JsonObject> reachableDevices = new ArrayList<>();
+        var futures = new ArrayList<Future>();
+
+        var reachableDevices = new ArrayList<>();
 
         for (int i = 0; i < devices.size(); i++)
         {
-            JsonObject device = devices.getJsonObject(i);
+            var device = devices.getJsonObject(i);
 
-            List<String> command = commandProvider.apply(device);
+            var command = commandProvider.apply(device);
 
-            Promise<Void> promise = Promise.promise();
+            var promise = Promise.promise();
 
             futures.add(promise.future());
 
@@ -37,7 +42,7 @@ public class ConnectivityUtil
 
                     process = builder.start();
 
-                    int exitCode = process.waitFor();
+                    var exitCode = process.waitFor(timeout, TimeUnit.SECONDS) ? process.exitValue() : -1;
 
                     if (exitCode == 0)
                     {
@@ -49,9 +54,9 @@ public class ConnectivityUtil
 
                     execPromise.complete();
                 }
-                catch (IOException | InterruptedException e)
+                catch (Exception e)
                 {
-                    execPromise.fail(e);
+                    execPromise.fail(e.getMessage());
                 }
                 finally
                 {

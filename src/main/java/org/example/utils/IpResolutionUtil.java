@@ -10,7 +10,7 @@ public class IpResolutionUtil {
 
     public static Future<String> resolveAndValidateIp(Vertx vertx, String hostOrIp)
     {
-        Future<String> ipFuture = vertx.executeBlocking(() ->
+        var ipFuture = vertx.executeBlocking(() ->
         {
             try
             {
@@ -19,7 +19,7 @@ public class IpResolutionUtil {
                     return null;
                 }
 
-                InetAddress inetAddress = InetAddress.getByName(hostOrIp);
+                var inetAddress = InetAddress.getByName(hostOrIp);
 
                 return inetAddress.getHostAddress();
             }

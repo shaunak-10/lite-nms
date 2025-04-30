@@ -7,9 +7,12 @@ import org.example.db.DatabaseVerticle;
 import org.example.plugin.PluginVerticle;
 import org.example.scheduler.SchedulerVerticle;
 import org.example.server.HttpServerVerticle;
+import org.example.utils.ConfigLoader;
 import org.example.utils.LoggerUtil;
 
 import java.util.List;
+
+import static org.example.constants.AppConstants.AddressesAndPaths.CONFIG_FILE_PATH;
 
 public class MainApp
 {
@@ -21,6 +24,8 @@ public class MainApp
         {
             DatabaseClient.testConnection(dbRes ->
             {
+                ConfigLoader.init(CONFIG_FILE_PATH);
+
                 if (dbRes.failed())
                 {
                     System.err.println("❌ Failed to connect to DB: " + dbRes.cause());
@@ -32,14 +37,26 @@ public class MainApp
 
                 LoggerUtil.getConsoleLogger().info("✅ Database connected successfully!");
 
-                deployAllVerticles(vertx)
-                        .onSuccess(v -> LoggerUtil.getConsoleLogger().info("🚀 All verticles deployed successfully!"))
-                        .onFailure(err ->
-                        {
-                            LoggerUtil.getConsoleLogger().severe("❌ Failed to deploy verticles: " + err.getMessage());
+                DatabaseClient.createTablesIfNotExist(tableRes ->
+                {
+                    if (tableRes.failed())
+                    {
+                        LoggerUtil.getConsoleLogger().severe("❌ Failed to create tables: " + tableRes.cause().getMessage());
 
-                            vertx.close();
-                        });
+                        vertx.close();
+
+                        return;
+                    }
+
+                    LoggerUtil.getConsoleLogger().info("📦 Tables created or already exist.");
+
+                    deployAllVerticles(vertx)
+                            .onSuccess(v -> LoggerUtil.getConsoleLogger().info("🚀 All verticles deployed successfully!"))
+                            .onFailure(err -> {
+                                LoggerUtil.getConsoleLogger().severe("❌ Failed to deploy verticles: " + err.getMessage());
+                                vertx.close();
+                            });
+                });
             });
         }
         catch (Exception ex)
@@ -68,7 +85,6 @@ public class MainApp
                             .mapEmpty()
             );
         }
-
         return chain;
     }
 }

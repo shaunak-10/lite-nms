@@ -36,7 +36,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
     @Override
     public void add(RoutingContext ctx)
     {
-        JsonObject body = ctx.body().asJsonObject();
+        var body = ctx.body().asJsonObject();
 
         if (body == null)
         {
@@ -47,13 +47,13 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
         try
         {
-            String name = body.getString(NAME);
+            var name = body.getString(NAME);
 
-            String ip = body.getString(IP);
+            var ip = body.getString(IP);
 
-            int port = body.getInteger(PORT, 22);
+            var port = body.getInteger(PORT, 22);
 
-            int credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
+            var credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
 
             if (name == null || ip == null || credentialProfileId == 0)
             {
@@ -84,14 +84,18 @@ public class DiscoveryHandler extends AbstractCrudHandler
                         executeQuery(ADD_DISCOVERY, List.of(name, validIp, port, INACTIVE, credentialProfileId))
                                 .onSuccess(result ->
                                 {
-                                    JsonArray rows = result.getJsonArray("rows");
+                                    var rows = result.getJsonArray("rows");
 
                                     if (rows != null && !rows.isEmpty())
                                     {
-                                        int id = rows.getJsonObject(0).getInteger(ID);
+                                        var id = rows.getJsonObject(0).getInteger(ID);
 
                                         LOGGER.info("Discovery profile added with ID: " + id);
 
+                                        // Fetch device details and trigger discovery
+                                        fetchDeviceDetailsAndRunDiscovery(ctx, id, validIp, port, credentialProfileId);
+
+                                        // Respond to the client immediately
                                         handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
                                     }
                                     else
@@ -116,6 +120,62 @@ public class DiscoveryHandler extends AbstractCrudHandler
         }
     }
 
+    private void fetchDeviceDetailsAndRunDiscovery(RoutingContext ctx, int id, String ip, int port, int credentialProfileId)
+    {
+        // Query to fetch username and password based on credentialProfileId
+        String query = "SELECT username, password FROM credential_profile WHERE id = $1";
+        executeQuery(query, List.of(credentialProfileId))
+                .onSuccess(result ->
+                {
+                    var rows = result.getJsonArray("rows", new JsonArray());
+
+                    if (rows.isEmpty())
+                    {
+                        LOGGER.warning("No credentials found for credentialProfileId: " + credentialProfileId);
+
+                        return;
+                    }
+
+                    var row = rows.getJsonObject(0);
+
+                    var username = row.getString(USERNAME);
+
+                    var password = "";
+
+                    try
+                    {
+                        password = DecryptionUtil.decrypt(row.getString(PASSWORD));
+                    }
+                    catch (Exception e)
+                    {
+                        LOGGER.warning("Failed to decrypt password: " + e.getMessage());
+
+                        return;
+                    }
+
+                    // Construct device JSON object
+                    var device = new JsonObject()
+                            .put(ID, id)
+                            .put(IP, ip)
+                            .put(PORT, port)
+                            .put(USERNAME, username)
+                            .put(PASSWORD, password);
+
+                    var devices = new JsonArray().add(device);
+
+                    var defaultResults = new JsonArray().add(new JsonObject()
+                            .put(ID, id)
+                            .put("reachable", false));
+
+                    // Run discovery for the single device
+                    startDiscoveryPipeline(ctx, devices, defaultResults);
+                })
+                .onFailure(cause ->
+                {
+                    LOGGER.warning("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage());
+                });
+    }
+
     @Override
     public void list(RoutingContext ctx)
     {
@@ -124,13 +184,13 @@ public class DiscoveryHandler extends AbstractCrudHandler
         executeQuery(GET_ALL_DISCOVERY)
                 .onSuccess(result ->
                 {
-                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+                    var rows = result.getJsonArray("rows", new JsonArray());
 
-                    JsonArray discoveryList = new JsonArray();
+                    var discoveryList = new JsonArray();
 
-                    for (int i = 0; i < rows.size(); i++)
+                    for (var i = 0; i < rows.size(); i++)
                     {
-                        JsonObject row = rows.getJsonObject(i);
+                        var row = rows.getJsonObject(i);
 
                         discoveryList.add(new JsonObject()
                                 .put(ID, row.getInteger(ID))
@@ -151,7 +211,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
     @Override
     public void getById(RoutingContext ctx)
     {
-        int id = validateIdFromPath(ctx);
+        var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
 
@@ -160,7 +220,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
         executeQuery(GET_DISCOVERY_BY_ID, List.of(id))
                 .onSuccess(result ->
                 {
-                    JsonArray rows = result.getJsonArray("rows", new JsonArray());
+                    var rows = result.getJsonArray("rows", new JsonArray());
 
                     if (rows.isEmpty())
                     {
@@ -168,7 +228,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     }
                     else
                     {
-                        JsonObject row = rows.getJsonObject(0);
+                        var row = rows.getJsonObject(0);
 
                         handleSuccess(ctx, new JsonObject()
                                 .put(ID, row.getInteger(ID))
@@ -184,11 +244,11 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
     public void update(RoutingContext ctx)
     {
-        int id = validateIdFromPath(ctx);
+        var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
 
-        JsonObject body = ctx.body().asJsonObject();
+        var body = ctx.body().asJsonObject();
 
         if (body == null || body.isEmpty())
         {
@@ -201,13 +261,13 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
         try
         {
-            String name = body.getString(NAME);
+            var name = body.getString(NAME);
 
-            String ip = body.getString(IP);
+            var ip = body.getString(IP);
 
-            int port = body.getInteger(PORT, 22);
+            var port = body.getInteger(PORT, 22);
 
-            int credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
+            var credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
 
             if (name == null || ip == null || credentialProfileId == 0)
             {
@@ -236,7 +296,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                         executeQuery(UPDATE_DISCOVERY, List.of(name, validIp, port, credentialProfileId, id))
                                 .onSuccess(result ->
                                 {
-                                    int rowCount = result.getInteger("rowCount", 0);
+                                    var rowCount = result.getInteger("rowCount", 0);
 
                                     if (rowCount == 0)
                                     {
@@ -261,6 +321,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
         catch (Exception e)
         {
             LOGGER.warning("Invalid input in update(): " + e.getMessage());
+
             handleInvalidData(ctx, LOGGER, INVALID_JSON_BODY);
         }
     }
@@ -291,51 +352,6 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     }
                 })
                 .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, cause));
-    }
-
-    public void runDiscovery(RoutingContext ctx)
-    {
-        LOGGER.info("Starting discovery run for all devices");
-
-        executeQuery(DATA_TO_PLUGIN_FOR_DISCOVERY)
-                .onSuccess(dbRes ->
-                {
-                    JsonArray rows = dbRes.getJsonArray("rows", new JsonArray());
-
-                    JsonArray devices = new JsonArray();
-
-                    JsonArray defaultResults = new JsonArray();
-
-                    for (int i = 0; i < rows.size(); i++)
-                    {
-                        try
-                        {
-                            JsonObject row = rows.getJsonObject(i);
-
-                            JsonObject device = new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put(PORT, row.getInteger(PORT))
-                                    .put(IP, row.getString(IP))
-                                    .put(USERNAME, row.getString(USERNAME))
-                                    .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)));
-
-                            devices.add(device);
-
-                            defaultResults.add(new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put("reachable", false));
-                        }
-                        catch (Exception e)
-                        {
-                            LOGGER.warning("Failed to process device row: " + e.getMessage());
-                        }
-                    }
-
-                    if(handleIfEmpty(ctx,devices)) return;
-
-                    startDiscoveryPipeline(ctx, devices, defaultResults);
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
 
     private void startDiscoveryPipeline(RoutingContext ctx, JsonArray devices, JsonArray defaultResults)
@@ -411,21 +427,66 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 });
     }
 
+    public void runDiscovery(RoutingContext ctx)
+    {
+        LOGGER.info("Starting discovery run for all devices");
+
+        executeQuery(DATA_TO_PLUGIN_FOR_DISCOVERY)
+                .onSuccess(dbRes ->
+                {
+                    JsonArray rows = dbRes.getJsonArray("rows", new JsonArray());
+
+                    JsonArray devices = new JsonArray();
+
+                    JsonArray defaultResults = new JsonArray();
+
+                    for (int i = 0; i < rows.size(); i++)
+                    {
+                        try
+                        {
+                            JsonObject row = rows.getJsonObject(i);
+
+                            JsonObject device = new JsonObject()
+                                    .put(ID, row.getInteger(ID))
+                                    .put(PORT, row.getInteger(PORT))
+                                    .put(IP, row.getString(IP))
+                                    .put(USERNAME, row.getString(USERNAME))
+                                    .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)));
+
+                            devices.add(device);
+
+                            defaultResults.add(new JsonObject()
+                                    .put(ID, row.getInteger(ID))
+                                    .put("reachable", false));
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.warning("Failed to process device row: " + e.getMessage());
+                        }
+                    }
+
+                    if(handleIfEmpty(ctx,devices)) return;
+
+                    startDiscoveryPipeline(ctx, devices, defaultResults);
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+    }
+
     private void updateDiscoveryStatus(RoutingContext ctx, JsonArray defaultResults)
     {
-        List<List<Object>> batchParams = new ArrayList<>();
+        var batchParams = new ArrayList<List<Object>>();
 
-        for (int i = 0; i < defaultResults.size(); i++)
+        for (var i = 0; i < defaultResults.size(); i++)
         {
-            JsonObject result = defaultResults.getJsonObject(i);
+            var result = defaultResults.getJsonObject(i);
 
-            int id = result.getInteger(ID);
+            var id = result.getInteger(ID);
 
-            boolean reachable = result.getBoolean("reachable");
+            var reachable = result.getBoolean("reachable");
 
-            String status = reachable ? ACTIVE : INACTIVE;
+            var status = reachable ? ACTIVE : INACTIVE;
 
-            List<Object> paramSet = new ArrayList<>();
+            var paramSet = new ArrayList<>();
 
             paramSet.add(status);
 
@@ -438,15 +499,21 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 .onSuccess(res ->
                 {
                     LOGGER.info("Batch status update successful for " + defaultResults.size() + " devices.");
-
-                    ctx.json(new JsonObject().put("results", defaultResults));
+                    // Send response only for runDiscovery (multiple devices)
+                    if (defaultResults.size() > 1)
+                    {
+                        ctx.json(new JsonObject().put("results", defaultResults));
+                    }
                 })
                 .onFailure(err ->
                 {
                     LOGGER.warning("Batch update failed: " + err.getMessage());
-
-                    ctx.response().setStatusCode(500)
-                            .end(new JsonObject().put(ERROR, "Status update failed").encode());
+                    // Send error response only for runDiscovery (multiple devices)
+                    if (defaultResults.size() > 1)
+                    {
+                        ctx.response().setStatusCode(500)
+                                .end(new JsonObject().put(ERROR, "Status update failed").encode());
+                    }
                 });
     }
 

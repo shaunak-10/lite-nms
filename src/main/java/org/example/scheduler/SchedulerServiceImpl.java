@@ -10,6 +10,7 @@ import org.example.plugin.PluginService;
 import org.example.plugin.PluginVerticle;
 import org.example.utils.DecryptionUtil;
 import org.example.utils.LoggerUtil;
+import org.example.utils.PingUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,7 +58,7 @@ public class SchedulerServiceImpl implements SchedulerService {
         {
             LOGGER.info("Running scheduled polling task");
 
-            JsonObject request = new JsonObject()
+            var request = new JsonObject()
                     .put("query", DATA_TO_PLUGIN_FOR_POLLING)
                     .put("params", Collections.emptyList());
 
@@ -71,16 +72,17 @@ public class SchedulerServiceImpl implements SchedulerService {
                             return;
                         }
 
-                        JsonArray devices = new JsonArray();
+                        var devices = new JsonArray();
 
-                        JsonArray rows = dbResponse.getJsonArray("rows", new JsonArray());
+                        var rows = dbResponse.getJsonArray("rows", new JsonArray());
 
-                        for (Object rowObj : rows)
+                        for (var rowObj : rows)
                         {
-                            JsonObject row = (JsonObject) rowObj;
+                            var row = (JsonObject) rowObj;
 
-                            try {
-                                JsonObject device = new JsonObject()
+                            try
+                            {
+                                var device = new JsonObject()
                                         .put(ID, row.getInteger(ID))
                                         .put(PORT, row.getInteger(PORT))
                                         .put(IP, row.getString(IP))
@@ -88,7 +90,6 @@ public class SchedulerServiceImpl implements SchedulerService {
                                         .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)));
 
                                 devices.add(device);
-
                             }
                             catch (Exception e)
                             {
@@ -103,43 +104,55 @@ public class SchedulerServiceImpl implements SchedulerService {
                             return;
                         }
 
-                        pluginService.runSSHMetrics(devices)
-                                .onSuccess(metricsResults ->
+                        PingUtil.filterReachableDevicesAsync(vertx, devices)
+                                .onFailure(err -> LOGGER.warning("Ping filtering failed: " + err.getMessage()))
+                                .onSuccess(pingedDevices ->
                                 {
-                                    LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
-
-                                    List<List<Object>> batchParams = new ArrayList<>();
-
-                                    for (int i = 0; i < metricsResults.size(); i++)
+                                    if (pingedDevices.isEmpty())
                                     {
-                                        JsonObject result = metricsResults.getJsonObject(i);
+                                        LOGGER.info("No devices reachable via ping. Skipping polling.");
 
-                                        int deviceId = result.getInteger("id");
-
-                                        JsonObject metrics = result.copy();
-
-                                        metrics.remove("id");
-
-                                        batchParams.add(List.of(deviceId, metrics.encode()));
+                                        return;
                                     }
 
-                                    databaseService.executeBatch(new JsonObject()
-                                                    .put("query", INSERT_POLLING_RESULT)
-                                                    .put("params", new JsonArray(batchParams)))
-                                            .onSuccess(batchResponse ->
+                                    pluginService.runSSHMetrics(pingedDevices)
+                                            .onSuccess(metricsResults ->
                                             {
-                                                if (batchResponse.getBoolean("success"))
+                                                LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
+
+                                                var batchParams = new ArrayList<>();
+
+                                                for (var i = 0; i < metricsResults.size(); i++)
                                                 {
-                                                    LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
+                                                    var result = metricsResults.getJsonObject(i);
+
+                                                    var deviceId = result.getInteger("id");
+
+                                                    var metrics = result.copy();
+
+                                                    metrics.remove("id");
+
+                                                    batchParams.add(List.of(deviceId, metrics.encode()));
                                                 }
-                                                else
-                                                {
-                                                    LOGGER.warning("Batch insert of polling results failed: " + batchResponse.getString("error"));
-                                                }
+
+                                                databaseService.executeBatch(new JsonObject()
+                                                                .put("query", INSERT_POLLING_RESULT)
+                                                                .put("params", new JsonArray(batchParams)))
+                                                        .onSuccess(batchResponse ->
+                                                        {
+                                                            if (batchResponse.getBoolean("success"))
+                                                            {
+                                                                LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
+                                                            }
+                                                            else
+                                                            {
+                                                                LOGGER.warning("Batch insert failed: " + batchResponse.getString("error"));
+                                                            }
+                                                        })
+                                                        .onFailure(err -> LOGGER.warning("Batch insert failed: " + err.getMessage()));
                                             })
-                                            .onFailure(err -> LOGGER.warning("Batch insert failed: " + err.getMessage()));
-                                })
-                                .onFailure(err -> LOGGER.warning("Plugin polling failed: " + err.getMessage()));
+                                            .onFailure(err -> LOGGER.warning("Plugin polling failed: " + err.getMessage()));
+                                });
                     })
                     .onFailure(err -> LOGGER.warning("DB query failed: " + err.getMessage()));
         });
@@ -147,26 +160,5 @@ public class SchedulerServiceImpl implements SchedulerService {
         LOGGER.info("Polling scheduled every " + interval + "ms");
 
         return Future.succeededFuture("Polling scheduled");
-    }
-
-    @Override
-    public Future<String> stopPolling()
-    {
-        if (pollingTimerId != -1)
-        {
-            vertx.cancelTimer(pollingTimerId);
-
-            pollingTimerId = -1;
-
-            LOGGER.info("Polling timer cancelled");
-
-            return Future.succeededFuture("Polling stopped");
-        }
-        else
-        {
-            LOGGER.info("No polling timer to stop");
-
-            return Future.failedFuture("No polling to stop");
-        }
     }
 }

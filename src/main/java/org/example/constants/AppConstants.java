@@ -18,7 +18,6 @@ public class AppConstants {
         public static final String UPDATE_DISCOVERY = "UPDATE discovery_profile SET name = $1, ip = $2, port = $3, credential_profile_id = $4 WHERE id = $5";
         public static final String DATA_TO_PLUGIN_FOR_DISCOVERY = "SELECT d.id, d.port, d.ip, c.username, c.password FROM discovery_profile d JOIN credential_profile c ON d.credential_profile_id = c.id";
         public static final String UPDATE_DISCOVERY_STATUS = "UPDATE discovery_profile SET status = $1 WHERE id = $2";
-
     }
 
 
@@ -102,12 +101,38 @@ public class AppConstants {
         public static final String DISCOVERY_RUN = "/discovery/run";
         public static final String PROVISIONS = "/provision";
         public static final String PROVISION_BY_ID = "/provision/:id";
-        public static final String PROVISION_POLLING_START = "/provision/polling/start";
-        public static final String PROVISION_POLLING_STOP = "/provision/polling/stop";
     }
 
     public static class AddressesAndPaths
     {
         public static final String PLUGIN_PATH = "/home/shaunak/IdeaProjects/http-server/src/main/java/org/example/plugin_executable/ssh-plugin";
+        public static final String CONFIG_FILE_PATH = "src/main/resources/config.json";
     }
+
+    public static class PingConstants
+    {
+        public static final String PACKETS_OPTION = "-c";
+        public static final String INTERVAL_OPTION = "-i";
+        public static final String TIMEOUT_OPTION= "-W";
+        public static final String COUNT= "count";
+        public static final String TIMEOUT = "timeout";
+        public static final String INTERVAL= "interval";
+        public static final String PING_COMMAND = "ping";
+    }
+
+    public static class PortConstants
+    {
+        public static final String TIMEOUT_OPTION = "-w";
+        public static final String NC_COMMAND = "nc";
+        public static final String ZERO_IO = "-zv";
+        public static final String PORT = "port";
+        public static final String TIMEOUT = "timeout";
+    }
+
+    public static class ConfigKeys
+    {
+        public static final String PROCESS = "process";
+    }
+
+
 }

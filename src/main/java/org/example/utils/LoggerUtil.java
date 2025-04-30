@@ -12,7 +12,7 @@ public class LoggerUtil {
 
     private static Logger createLogger(String name, String filePath)
     {
-        Logger logger = Logger.getLogger(name);
+        var logger = Logger.getLogger(name);
 
         logger.setUseParentHandlers(false);
 
@@ -20,7 +20,7 @@ public class LoggerUtil {
 
         try
         {
-            FileHandler fileHandler = new FileHandler(filePath, true);
+            var fileHandler = new FileHandler(filePath, true);
 
             fileHandler.setFormatter(new SimpleFormatter());
 
@@ -36,13 +36,13 @@ public class LoggerUtil {
 
     private static Logger createConsoleLogger()
     {
-        Logger logger = Logger.getLogger("LiteNMS.ConsoleLogger");
+        var logger = Logger.getLogger("LiteNMS.ConsoleLogger");
 
         logger.setUseParentHandlers(false);
 
         logger.setLevel(Level.ALL);
 
-        ConsoleHandler consoleHandler = new ConsoleHandler();
+        var consoleHandler = new ConsoleHandler();
 
         consoleHandler.setFormatter(new SimpleFormatter());
 

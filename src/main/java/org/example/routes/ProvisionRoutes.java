@@ -16,10 +16,6 @@ public class ProvisionRoutes
 
         router.get(PROVISIONS).handler(handler::list);
 
-        router.post(PROVISION_POLLING_START).handler(handler::startPolling);
-
-        router.post(PROVISION_POLLING_STOP).handler(handler::stopPolling);
-
         router.get(PROVISION_BY_ID).handler(handler::getById);
 
         router.put(PROVISION_BY_ID).handler(handler::update);

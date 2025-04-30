@@ -29,20 +29,21 @@ public class DatabaseServiceImpl implements DatabaseService
     @Override
     public Future<JsonObject> executeQuery(JsonObject request)
     {
-        String query = request.getString("query");
+        var query = request.getString("query");
 
         LOGGER.info("Executing query: " + query);
 
         if (request.containsKey("params"))
         {
-            JsonArray paramsArray = request.getJsonArray("params");
+            var paramsArray = request.getJsonArray("params");
 
-            Tuple params = Tuple.tuple();
+            var params = Tuple.tuple();
 
-            for (Object param : paramsArray)
+            for (var param : paramsArray)
             {
                 params.addValue(param);
             }
+
             return dbClient.preparedQuery(query)
                     .execute(params)
                     .map(this::processQueryResult)
@@ -60,9 +61,9 @@ public class DatabaseServiceImpl implements DatabaseService
     @Override
     public Future<JsonObject> executeBatch(JsonObject request)
     {
-        String query = request.getString("query");
+        var query = request.getString("query");
 
-        JsonArray paramsArray = request.getJsonArray("params");
+        var paramsArray = request.getJsonArray("params");
 
         if (paramsArray == null || paramsArray.isEmpty())
         {
@@ -75,13 +76,13 @@ public class DatabaseServiceImpl implements DatabaseService
 
         List<Tuple> batchParams = new ArrayList<>();
 
-        for (Object param : paramsArray)
+        for (var param : paramsArray)
         {
-            JsonArray paramArray = (JsonArray) param;
+            var paramArray = (JsonArray) param;
 
-            Tuple tuple = Tuple.tuple();
+            var tuple = Tuple.tuple();
 
-            for (Object value : paramArray)
+            for (var value : paramArray)
             {
                 tuple.addValue(value);
             }
@@ -97,23 +98,26 @@ public class DatabaseServiceImpl implements DatabaseService
 
     private JsonObject processQueryResult(RowSet<Row> result)
     {
-        JsonObject response = new JsonObject()
+        var response = new JsonObject()
                 .put("success", true)
                 .put("rowCount", result.rowCount());
 
-        // check if the result is empty and add try catch in the loop
-
-        JsonArray rows = new JsonArray();
-
-        for (Row row : result)
+        if (result.size() == 0)
         {
-            JsonObject jsonRow = new JsonObject();
+            return response;
+        }
 
-            for (int i = 0; i < row.size(); i++)
+        var rows = new JsonArray();
+
+        for (var row : result)
+        {
+            var jsonRow = new JsonObject();
+
+            for (var i = 0; i < row.size(); i++)
             {
-                String columnName = row.getColumnName(i);
+                var columnName = row.getColumnName(i);
 
-                Object value = row.getValue(i);
+                var value = row.getValue(i);
 
                 jsonRow.put(columnName, value);
             }
