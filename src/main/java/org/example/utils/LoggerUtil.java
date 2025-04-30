@@ -4,53 +4,67 @@ import java.util.logging.*;
 
 public class LoggerUtil {
 
-    private static final Logger databaseLogger = Logger.getLogger("LiteNMS.DatabaseLogger");
+    private static final Logger mainLogger = createLogger("LiteNMS.DatabaseLogger", "logs/main-events.log");
 
-    private static final Logger pluginLogger = Logger.getLogger("LiteNMS.PluginLogger");
+    private static final Logger pluginLogger = createLogger("LiteNMS.PluginLogger", "logs/plugin-events.log");
 
-    static
+    private static final Logger consoleLogger = createConsoleLogger();
+
+    private static Logger createLogger(String name, String filePath)
     {
+        Logger logger = Logger.getLogger(name);
+
+        logger.setUseParentHandlers(false);
+
+        logger.setLevel(Level.ALL);
+
         try
         {
+            FileHandler fileHandler = new FileHandler(filePath, true);
 
-            Level level = Level.ALL;
+            fileHandler.setFormatter(new SimpleFormatter());
 
-            Formatter formatter = new SimpleFormatter();
-
-            FileHandler dbHandler = new FileHandler("logs/database-events.log", true);
-
-            dbHandler.setFormatter(formatter);
-
-            databaseLogger.setUseParentHandlers(false);
-
-            databaseLogger.setLevel(level);
-
-            databaseLogger.addHandler(dbHandler);
-
-            FileHandler pluginHandler = new FileHandler("logs/plugin-events.log", true);
-
-            pluginHandler.setFormatter(formatter);
-
-            pluginLogger.setUseParentHandlers(false);
-
-            pluginLogger.setLevel(level);
-
-            pluginLogger.addHandler(pluginHandler);
-
+            logger.addHandler(fileHandler);
         }
         catch (Exception e)
         {
-            System.err.println("Failed to setup loggers: " + e.getMessage());
+            System.err.println("Failed to setup file logger for " + name + ": " + e.getMessage());
         }
+
+        return logger;
     }
 
-    public static Logger getDatabaseLogger()
+    private static Logger createConsoleLogger()
     {
-        return databaseLogger;
+        Logger logger = Logger.getLogger("LiteNMS.ConsoleLogger");
+
+        logger.setUseParentHandlers(false);
+
+        logger.setLevel(Level.ALL);
+
+        ConsoleHandler consoleHandler = new ConsoleHandler();
+
+        consoleHandler.setFormatter(new SimpleFormatter());
+
+        consoleHandler.setLevel(Level.ALL);
+
+        logger.addHandler(consoleHandler);
+
+        return logger;
+    }
+
+    public static Logger getMainLogger()
+    {
+        return mainLogger;
     }
 
     public static Logger getPluginLogger()
     {
         return pluginLogger;
+    }
+
+    public static Logger getConsoleLogger()
+    {
+        return consoleLogger;
     }
 }

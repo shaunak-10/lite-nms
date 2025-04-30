@@ -6,7 +6,8 @@ import io.vertx.core.json.JsonArray;
 
 import java.util.Arrays;
 
-public class PortUtil {
+public class PortUtil
+{
     public static Future<JsonArray> filterReachableDevicesAsync(Vertx vertx, JsonArray devices)
     {
         return ConnectivityUtil.filterReachableDevicesAsync(vertx, devices, device ->

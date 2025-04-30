@@ -16,7 +16,7 @@ import static org.example.constants.AppConstants.Message.*;
 
 public class CredentialHandler extends AbstractCrudHandler {
 
-    private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
+    private static final Logger LOGGER = LoggerUtil.getMainLogger();
 
     private static final CredentialHandler INSTANCE = new CredentialHandler();
 

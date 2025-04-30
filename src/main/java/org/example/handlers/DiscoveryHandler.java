@@ -24,7 +24,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 {
     private static final DiscoveryHandler INSTANCE = new DiscoveryHandler();
 
-    private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
+    private static final Logger LOGGER = LoggerUtil.getMainLogger();
 
     private DiscoveryHandler() {}
 

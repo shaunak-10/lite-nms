@@ -17,7 +17,7 @@ import java.util.logging.Logger;
 public class DatabaseServiceImpl implements DatabaseService
 {
 
-    private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
+    private static final Logger LOGGER = LoggerUtil.getMainLogger();
 
     private final SqlClient dbClient;
 
@@ -100,6 +100,8 @@ public class DatabaseServiceImpl implements DatabaseService
         JsonObject response = new JsonObject()
                 .put("success", true)
                 .put("rowCount", result.rowCount());
+
+        // check if the result is empty and add try catch in the loop
 
         JsonArray rows = new JsonArray();
 

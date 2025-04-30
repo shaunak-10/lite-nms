@@ -7,6 +7,8 @@ import java.io.*;
 import java.util.logging.Logger;
 
 import static org.example.constants.AppConstants.AddressesAndPaths.PLUGIN_PATH;
+
+import org.example.MainApp;
 import org.example.utils.LoggerUtil;
 
 public class PluginServiceImpl implements PluginService
@@ -16,9 +18,9 @@ public class PluginServiceImpl implements PluginService
 
     private final Vertx vertx;
 
-    public PluginServiceImpl(Vertx vertx)
+    public PluginServiceImpl()
     {
-        this.vertx = vertx;
+        this.vertx = MainApp.vertx;
     }
 
     @Override

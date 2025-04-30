@@ -23,7 +23,7 @@ public class ProvisionHandler extends AbstractCrudHandler
 {
     private static final ProvisionHandler INSTANCE = new ProvisionHandler();
 
-    private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
+    private static final Logger LOGGER = LoggerUtil.getMainLogger();
 
     private ProvisionHandler() {}
 

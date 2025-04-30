@@ -4,11 +4,11 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import org.example.db.DatabaseClient;
 import org.example.db.DatabaseVerticle;
-import org.example.verticles.HttpServerVerticle;
 import org.example.plugin.PluginVerticle;
 import org.example.scheduler.SchedulerVerticle;
+import org.example.server.HttpServerVerticle;
+import org.example.utils.LoggerUtil;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class MainApp
@@ -17,76 +17,58 @@ public class MainApp
 
     public static void main(String[] args)
     {
-        DatabaseClient.testConnection(dbRes ->
+        try
         {
-            if (dbRes.failed())
+            DatabaseClient.testConnection(dbRes ->
             {
-                System.err.println("❌ Failed to connect to DB: " + dbRes.cause());
+                if (dbRes.failed())
+                {
+                    System.err.println("❌ Failed to connect to DB: " + dbRes.cause());
 
-                vertx.close();
+                    vertx.close();
 
-                return;
-            }
+                    return;
+                }
 
-            System.out.println("✅ Database connected successfully!");
+                LoggerUtil.getConsoleLogger().info("✅ Database connected successfully!");
 
-            deployAllVerticles(vertx)
-                    .onSuccess(v -> System.out.println("🚀 All verticles deployed successfully!"))
-                    .onFailure(err ->
-                    {
-                        System.err.println("❌ Failed to deploy verticles: " + err);
+                deployAllVerticles(vertx)
+                        .onSuccess(v -> LoggerUtil.getConsoleLogger().info("🚀 All verticles deployed successfully!"))
+                        .onFailure(err ->
+                        {
+                            LoggerUtil.getConsoleLogger().severe("❌ Failed to deploy verticles: " + err.getMessage());
 
-                        vertx.close();
-                    });
-        });
+                            vertx.close();
+                        });
+            });
+        }
+        catch (Exception ex)
+        {
+            LoggerUtil.getConsoleLogger().severe(ex.getMessage());
+        }
     }
 
-    private static Future<Void> deployAllVerticles(Vertx vertx)
+    private static Future<Object> deployAllVerticles(Vertx vertx)
     {
-        final List<String> deployedIds = new ArrayList<>();
+        var verticles = List.of(
+                DatabaseVerticle.class,
+                PluginVerticle.class,
+                SchedulerVerticle.class,
+                HttpServerVerticle.class
+        );
 
-        return vertx.deployVerticle(DatabaseVerticle.class.getName())
-                .compose(dbId ->
-                {
-                    deployedIds.add(dbId);
+        var chain = Future.succeededFuture();
 
-                    return vertx.deployVerticle(PluginVerticle.class.getName());
-                })
-                .compose(pluginId ->
-                {
-                    deployedIds.add(pluginId);
+        for (var verticle : verticles)
+        {
+            chain = chain.compose(ignored ->
+                    vertx.deployVerticle(verticle.getName())
+                            .onSuccess(id ->
+                                    LoggerUtil.getConsoleLogger().info("✅ Deployed: " + verticle.getSimpleName()))
+                            .mapEmpty()
+            );
+        }
 
-                    return vertx.deployVerticle(SchedulerVerticle.class.getName());
-                })
-                .compose(schedulerId ->
-                {
-                    deployedIds.add(schedulerId);
-
-                    return vertx.deployVerticle(HttpServerVerticle.class.getName());
-                })
-                .compose(httpId ->
-                {
-                    deployedIds.add(httpId);
-
-                    return Future.succeededFuture();
-                })
-                .recover(error ->
-                {
-                    System.err.println("Deployment failed: " + error.getMessage());
-
-                    System.out.println("Undeploying " + deployedIds.size() + " previously deployed verticles...");
-
-                    Future<Void> undeployFuture = Future.succeededFuture();
-
-                    for (String id : deployedIds)
-                    {
-                        undeployFuture = undeployFuture.compose(v -> vertx.undeploy(id)
-                                .onSuccess(v2 -> System.out.println("Undeployed verticle: " + id))
-                                .onFailure(err -> System.err.println("Failed to undeploy verticle " + id + ": " + err.getMessage())));
-                    }
-
-                    return undeployFuture.compose(v -> Future.failedFuture(error));
-                })
-                .mapEmpty();
+        return chain;
     }
 }

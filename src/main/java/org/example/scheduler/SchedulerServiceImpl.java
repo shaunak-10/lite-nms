@@ -24,7 +24,7 @@ import static org.example.constants.AppConstants.CredentialField.PASSWORD;
 
 public class SchedulerServiceImpl implements SchedulerService {
 
-    private static final Logger LOGGER = LoggerUtil.getDatabaseLogger();
+    private static final Logger LOGGER = LoggerUtil.getMainLogger();
 
     private final PluginService pluginService;
 

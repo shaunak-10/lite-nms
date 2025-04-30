@@ -1,4 +1,4 @@
-package org.example.verticles;
+package org.example.server;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import io.vertx.core.json.JsonObject;

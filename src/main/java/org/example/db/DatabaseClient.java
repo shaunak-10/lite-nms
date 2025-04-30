@@ -8,6 +8,7 @@ import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.sqlclient.PoolOptions;
 import io.vertx.sqlclient.SqlClient;
 import io.vertx.pgclient.PgBuilder;
+import org.example.utils.LoggerUtil;
 
 public class DatabaseClient
 {
@@ -19,38 +20,58 @@ public class DatabaseClient
     {
         if (client == null)
         {
-            PgConnectOptions connectOptions = new PgConnectOptions()
-                    .setPort(Integer.parseInt(dotenv.get("DB_PORT")))
-                    .setHost(dotenv.get("DB_HOST"))
-                    .setDatabase(dotenv.get("DB_NAME"))
-                    .setUser(dotenv.get("DB_USER"))
-                    .setPassword(dotenv.get("DB_PASSWORD"))
-                    .setConnectTimeout(5000)
-                    .setIdleTimeout(5*60*1000);
+            try
+            {
+                var connectOptions = new PgConnectOptions()
+                        .setPort(Integer.parseInt(dotenv.get("DB_PORT")))
+                        .setHost(dotenv.get("DB_HOST"))
+                        .setDatabase(dotenv.get("DB_NAME"))
+                        .setUser(dotenv.get("DB_USER"))
+                        .setPassword(dotenv.get("DB_PASSWORD"))
+                        .setConnectTimeout(5000)
+                        .setIdleTimeout(5 * 60 * 1000);
 
-            PoolOptions poolOptions = new PoolOptions()
-                    .setMaxSize(10);
+                var poolOptions = new PoolOptions()
+                        .setMaxSize(10);
 
-            client = PgBuilder.client()
-                    .with(poolOptions)
-                    .connectingTo(connectOptions)
-                    .build();
+                client = PgBuilder.client()
+                        .with(poolOptions)
+                        .connectingTo(connectOptions)
+                        .build();
+            }
+            catch (Exception ex)
+            {
+                LoggerUtil.getMainLogger().severe(ex.getMessage());
+            }
         }
+
         return client;
     }
 
     public static void testConnection(Handler<AsyncResult<Void>> resultHandler)
     {
-        getClient().query("SELECT 1").execute(ar ->
+        try
         {
-            if (ar.succeeded())
+            var client = getClient().query("SELECT 1");
+
+            if (client != null)
             {
-                resultHandler.handle(Future.succeededFuture());
+                client.execute(ar ->
+                {
+                    if (ar.succeeded())
+                    {
+                        resultHandler.handle(Future.succeededFuture());
+                    }
+                    else
+                    {
+                        resultHandler.handle(Future.failedFuture(ar.cause()));
+                    }
+                });
             }
-            else
-            {
-                resultHandler.handle(Future.failedFuture(ar.cause()));
-            }
-        });
+        }
+        catch (Exception e)
+        {
+            resultHandler.handle(Future.failedFuture(e));
+        }
     }
 }

@@ -9,9 +9,9 @@ import io.vertx.core.json.JsonArray;
 public interface PluginService
 {
 
-    static PluginService create(Vertx vertx)
+    static PluginService create()
     {
-        return new PluginServiceImpl(vertx);
+        return new PluginServiceImpl();
     }
 
     static PluginService createProxy(Vertx vertx, String address)
