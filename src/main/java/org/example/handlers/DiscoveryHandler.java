@@ -1,5 +1,7 @@
 package org.example.handlers;
 
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -11,7 +13,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
@@ -22,9 +23,9 @@ import static org.example.constants.AppConstants.Message.*;
 
 public class DiscoveryHandler extends AbstractCrudHandler
 {
-    private static final DiscoveryHandler INSTANCE = new DiscoveryHandler();
+    private static final Logger LOGGER = LoggerFactory.getLogger(DiscoveryHandler.class);
 
-    private static final Logger LOGGER = LoggerUtil.getMainLogger();
+    private static final DiscoveryHandler INSTANCE = new DiscoveryHandler();
 
     private DiscoveryHandler() {}
 
@@ -40,7 +41,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
         if (body == null)
         {
-            handleMissingData(ctx, LOGGER, INVALID_JSON_BODY);
+            handleMissingData(ctx, INVALID_JSON_BODY);
 
             return;
         }
@@ -57,7 +58,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             if (name == null || ip == null || credentialProfileId == 0)
             {
-                handleMissingData(ctx, LOGGER, MISSING_FIELDS);
+                handleMissingData(ctx, MISSING_FIELDS);
 
                 return;
             }
@@ -69,14 +70,14 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     {
                         if (validIp == null)
                         {
-                            handleInvalidData(ctx, LOGGER, INVALID_IP);
+                            handleInvalidData(ctx, INVALID_IP);
 
                             return;
                         }
 
                         if (isNotValidPort(port))
                         {
-                            handleInvalidData(ctx, LOGGER, INVALID_PORT);
+                            handleInvalidData(ctx, INVALID_PORT);
 
                             return;
                         }
@@ -103,27 +104,28 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                         handleSuccess(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS));
                                     }
                                 })
-                                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, cause));
+                                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
                     })
                     .onFailure(err ->
                     {
-                        LOGGER.warning("Error during IP resolution: " + err.getMessage());
+                        LOGGER.warn("Error during IP resolution: " + err.getMessage());
 
-                        handleInvalidData(ctx, LOGGER, INVALID_IP);
+                        handleInvalidData(ctx, INVALID_IP);
                     });
         }
         catch (Exception e)
         {
-            LOGGER.warning("Invalid input in add(): " + e.getMessage());
+            LOGGER.error("Invalid input in add(): " + e.getMessage());
 
-            handleInvalidData(ctx, LOGGER, INVALID_JSON_BODY);
+            handleInvalidData(ctx, INVALID_JSON_BODY);
         }
     }
 
     private void fetchDeviceDetailsAndRunDiscovery(RoutingContext ctx, int id, String ip, int port, int credentialProfileId)
     {
         // Query to fetch username and password based on credentialProfileId
-        String query = "SELECT username, password FROM credential_profile WHERE id = $1";
+        var query = "SELECT username, password FROM credential_profile WHERE id = $1";
+
         executeQuery(query, List.of(credentialProfileId))
                 .onSuccess(result ->
                 {
@@ -131,14 +133,12 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                     if (rows.isEmpty())
                     {
-                        LOGGER.warning("No credentials found for credentialProfileId: " + credentialProfileId);
+                        LOGGER.warn("No credentials found for credentialProfileId: " + credentialProfileId);
 
                         return;
                     }
 
                     var row = rows.getJsonObject(0);
-
-                    var username = row.getString(USERNAME);
 
                     var password = "";
 
@@ -148,7 +148,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     }
                     catch (Exception e)
                     {
-                        LOGGER.warning("Failed to decrypt password: " + e.getMessage());
+                        LOGGER.error("Failed to decrypt password: " + e.getMessage());
 
                         return;
                     }
@@ -158,7 +158,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                             .put(ID, id)
                             .put(IP, ip)
                             .put(PORT, port)
-                            .put(USERNAME, username)
+                            .put(USERNAME, row.getString(USERNAME))
                             .put(PASSWORD, password);
 
                     var devices = new JsonArray().add(device);
@@ -171,9 +171,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     startDiscoveryPipeline(ctx, devices, defaultResults);
                 })
                 .onFailure(cause ->
-                {
-                    LOGGER.warning("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage());
-                });
+                        LOGGER.error("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage()));
     }
 
     @Override
@@ -205,7 +203,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                     handleSuccess(ctx, new JsonObject().put(DISCOVERIES, discoveryList));
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
     @Override
@@ -224,7 +222,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                     if (rows.isEmpty())
                     {
-                        handleNotFound(ctx, LOGGER);
+                        handleNotFound(ctx);
                     }
                     else
                     {
@@ -239,7 +237,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                 .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
                     }
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
     public void update(RoutingContext ctx)
@@ -252,7 +250,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
         if (body == null || body.isEmpty())
         {
-            handleMissingData(ctx, LOGGER, NO_DATA_TO_UPDATE);
+            handleMissingData(ctx, NO_DATA_TO_UPDATE);
 
             return;
         }
@@ -271,14 +269,14 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             if (name == null || ip == null || credentialProfileId == 0)
             {
-                handleMissingData(ctx, LOGGER, MISSING_FIELDS);
+                handleMissingData(ctx, MISSING_FIELDS);
 
                 return;
             }
 
             if (isNotValidPort(port))
             {
-                handleInvalidData(ctx, LOGGER, INVALID_PORT);
+                handleInvalidData(ctx, INVALID_PORT);
 
                 return;
             }
@@ -288,7 +286,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     {
                         if (validIp == null)
                         {
-                            handleInvalidData(ctx, LOGGER, INVALID_IP);
+                            handleInvalidData(ctx, INVALID_IP);
 
                             return;
                         }
@@ -300,7 +298,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                                     if (rowCount == 0)
                                     {
-                                        handleNotFound(ctx, LOGGER);
+                                        handleNotFound(ctx);
                                     }
                                     else
                                     {
@@ -309,27 +307,27 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                         handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
                                     }
                                 })
-                                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, cause));
+                                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_UPDATE, cause));
                     })
                     .onFailure(err ->
                     {
-                        LOGGER.warning("IP resolution failed during update: " + err.getMessage());
+                        LOGGER.error("IP resolution failed during update: " + err.getMessage());
 
-                        handleInvalidData(ctx, LOGGER, INVALID_IP);
+                        handleInvalidData(ctx, INVALID_IP);
                     });
         }
         catch (Exception e)
         {
-            LOGGER.warning("Invalid input in update(): " + e.getMessage());
+            LOGGER.error("Invalid input in update(): " + e.getMessage());
 
-            handleInvalidData(ctx, LOGGER, INVALID_JSON_BODY);
+            handleInvalidData(ctx, INVALID_JSON_BODY);
         }
     }
 
     @Override
     public void delete(RoutingContext ctx)
     {
-        int id = validateIdFromPath(ctx);
+        var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
 
@@ -338,11 +336,11 @@ public class DiscoveryHandler extends AbstractCrudHandler
         executeQuery(DELETE_DISCOVERY, List.of(id))
                 .onSuccess(result ->
                 {
-                    int rowCount = result.getInteger("rowCount", 0);
+                    var rowCount = result.getInteger("rowCount", 0);
 
                     if (rowCount == 0)
                     {
-                        handleNotFound(ctx, LOGGER);
+                        handleNotFound(ctx);
                     }
                     else
                     {
@@ -351,7 +349,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                         handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                     }
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
     }
 
     private void startDiscoveryPipeline(RoutingContext ctx, JsonArray devices, JsonArray defaultResults)
@@ -384,12 +382,12 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                     return;
                                 }
 
-                                PluginService pluginService = PluginService.createProxy(ctx.vertx(), PluginVerticle.SERVICE_ADDRESS);
+                                var pluginService = PluginService.createProxy(ctx.vertx(), PluginVerticle.SERVICE_ADDRESS);
 
                                 pluginService.runSSHReachability(portFilteredDevices)
                                         .onFailure(err ->
                                         {
-                                            LOGGER.warning("SSH plugin call failed: " + err.getMessage());
+                                            LOGGER.error("SSH plugin call failed: " + err.getMessage());
 
                                             ctx.response()
                                                     .setStatusCode(500)
@@ -397,20 +395,20 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                         })
                                         .onSuccess(sshResults ->
                                         {
-                                            Map<Integer, Boolean> sshReachabilityMap = new HashMap<>();
+                                            var sshReachabilityMap = new HashMap<>();
 
-                                            for (int i = 0; i < sshResults.size(); i++)
+                                            for (var i = 0; i < sshResults.size(); i++)
                                             {
-                                                JsonObject pluginResult = sshResults.getJsonObject(i);
+                                                var pluginResult = sshResults.getJsonObject(i);
 
                                                 sshReachabilityMap.put(pluginResult.getInteger(ID), pluginResult.getBoolean("reachable"));
                                             }
 
-                                            for (int i = 0; i < defaultResults.size(); i++)
+                                            for (var i = 0; i < defaultResults.size(); i++)
                                             {
-                                                JsonObject deviceResult = defaultResults.getJsonObject(i);
+                                                var deviceResult = defaultResults.getJsonObject(i);
 
-                                                int id = deviceResult.getInteger(ID);
+                                                var id = deviceResult.getInteger(ID);
 
                                                 if (sshReachabilityMap.containsKey(id))
                                                 {
@@ -460,7 +458,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                         }
                         catch (Exception e)
                         {
-                            LOGGER.warning("Failed to process device row: " + e.getMessage());
+                            LOGGER.error("Failed to process device row: " + e.getMessage());
                         }
                     }
 
@@ -468,7 +466,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                     startDiscoveryPipeline(ctx, devices, defaultResults);
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
     private void updateDiscoveryStatus(RoutingContext ctx, JsonArray defaultResults)
@@ -506,7 +504,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 })
                 .onFailure(err ->
                 {
-                    LOGGER.warning("Batch update failed: " + err.getMessage());
+                    LOGGER.error("Batch update failed: " + err.getMessage());
                     // Send error response only for runDiscovery (multiple devices)
                     if (defaultResults.size() > 1)
                     {

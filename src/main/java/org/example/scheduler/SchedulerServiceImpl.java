@@ -2,6 +2,8 @@ package org.example.scheduler;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.example.db.DatabaseService;
@@ -9,13 +11,11 @@ import org.example.db.DatabaseVerticle;
 import org.example.plugin.PluginService;
 import org.example.plugin.PluginVerticle;
 import org.example.utils.DecryptionUtil;
-import org.example.utils.LoggerUtil;
 import org.example.utils.PingUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import static org.example.constants.AppConstants.ProvisionField.*;
@@ -23,9 +23,10 @@ import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
 import static org.example.constants.AppConstants.ProvisionQuery.*;
 
-public class SchedulerServiceImpl implements SchedulerService {
+public class SchedulerServiceImpl implements SchedulerService
+{
 
-    private static final Logger LOGGER = LoggerUtil.getMainLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(SchedulerServiceImpl.class);
 
     private final PluginService pluginService;
 
@@ -49,7 +50,7 @@ public class SchedulerServiceImpl implements SchedulerService {
     {
         if (pollingTimerId != -1)
         {
-            LOGGER.warning("Polling already running. Ignoring new start request.");
+            LOGGER.warn("Polling already running. Ignoring new start request.");
 
             return Future.failedFuture("Polling already running");
         }
@@ -67,7 +68,7 @@ public class SchedulerServiceImpl implements SchedulerService {
                     {
                         if (!dbResponse.getBoolean("success"))
                         {
-                            LOGGER.warning("DB query failed: " + dbResponse.getString("error"));
+                            LOGGER.warn("DB query failed: " + dbResponse.getString("error"));
 
                             return;
                         }
@@ -93,7 +94,7 @@ public class SchedulerServiceImpl implements SchedulerService {
                             }
                             catch (Exception e)
                             {
-                                LOGGER.warning("Failed to process device: " + e.getMessage());
+                                LOGGER.error("Failed to process device: " + e.getMessage());
                             }
                         }
 
@@ -105,7 +106,7 @@ public class SchedulerServiceImpl implements SchedulerService {
                         }
 
                         PingUtil.filterReachableDevicesAsync(vertx, devices)
-                                .onFailure(err -> LOGGER.warning("Ping filtering failed: " + err.getMessage()))
+                                .onFailure(err -> LOGGER.error("Ping filtering failed: " + err.getMessage()))
                                 .onSuccess(pingedDevices ->
                                 {
                                     if (pingedDevices.isEmpty())
@@ -136,7 +137,7 @@ public class SchedulerServiceImpl implements SchedulerService {
                                                     .put("query", ADD_AVAILABILITY_DATA)
                                                     .put("params", new JsonArray(availabilityParams)))
                                             .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
-                                            .onFailure(err -> LOGGER.warning("Availability insert failed: " + err.getMessage()));
+                                            .onFailure(err -> LOGGER.error("Availability insert failed: " + err.getMessage()));
 
                                     pluginService.runSSHMetrics(pingedDevices)
                                             .onSuccess(metricsResults ->
@@ -169,15 +170,15 @@ public class SchedulerServiceImpl implements SchedulerService {
                                                             }
                                                             else
                                                             {
-                                                                LOGGER.warning("Batch insert failed: " + batchResponse.getString("error"));
+                                                                LOGGER.warn("Batch insert failed: " + batchResponse.getString("error"));
                                                             }
                                                         })
-                                                        .onFailure(err -> LOGGER.warning("Batch insert failed: " + err.getMessage()));
+                                                        .onFailure(err -> LOGGER.error("Batch insert failed: " + err.getMessage()));
                                             })
-                                            .onFailure(err -> LOGGER.warning("Plugin polling failed: " + err.getMessage()));
+                                            .onFailure(err -> LOGGER.error("Plugin polling failed: " + err.getMessage()));
                                 });
                     })
-                    .onFailure(err -> LOGGER.warning("DB query failed: " + err.getMessage()));
+                    .onFailure(err -> LOGGER.error("DB query failed: " + err.getMessage()));
         });
 
         LOGGER.info("Polling scheduled every " + interval + "ms");

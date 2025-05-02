@@ -1,5 +1,7 @@
 package org.example.handlers;
 
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -10,16 +12,14 @@ import static org.example.constants.AppConstants.ProvisionQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
-import org.example.utils.LoggerUtil;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 public class ProvisionHandler extends AbstractCrudHandler
 {
-    private static final ProvisionHandler INSTANCE = new ProvisionHandler();
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProvisionHandler.class);
 
-    private static final Logger LOGGER = LoggerUtil.getMainLogger();
+    private static final ProvisionHandler INSTANCE = new ProvisionHandler();
 
     private ProvisionHandler() {}
 
@@ -35,7 +35,7 @@ public class ProvisionHandler extends AbstractCrudHandler
 
         if (body == null)
         {
-            handleMissingData(ctx, LOGGER, INVALID_JSON_BODY);
+            handleMissingData(ctx, INVALID_JSON_BODY);
 
             return;
         }
@@ -44,7 +44,7 @@ public class ProvisionHandler extends AbstractCrudHandler
 
         if (discoveryProfileId == null)
         {
-            handleMissingData(ctx, LOGGER, MISSING_FIELDS);
+            handleMissingData(ctx, MISSING_FIELDS);
 
             return;
         }
@@ -58,7 +58,7 @@ public class ProvisionHandler extends AbstractCrudHandler
 
                     if (rows == null || rows.isEmpty())
                     {
-                        handleNotFound(ctx, LOGGER);
+                        handleNotFound(ctx);
 
                         return;
                     }
@@ -69,7 +69,7 @@ public class ProvisionHandler extends AbstractCrudHandler
 
                     if (!ACTIVE.equalsIgnoreCase(status))
                     {
-                        handleInvalidData(ctx, LOGGER, DEVICE_NOT_DISCOVERED);
+                        handleInvalidData(ctx, DEVICE_NOT_DISCOVERED);
 
                         return;
                     }
@@ -102,9 +102,9 @@ public class ProvisionHandler extends AbstractCrudHandler
                                     handleSuccess(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS));
                                 }
                             })
-                            .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, cause));
+                            .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
     @Override
@@ -139,12 +139,14 @@ public class ProvisionHandler extends AbstractCrudHandler
 
                     handleSuccess(ctx, new JsonObject().put("provisions", provisionList));
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
     @Override
     public void getById(RoutingContext ctx)
     {
+        System.out.println(ctx);
+
         var id = validateIdFromPath(ctx);
 
         if (id == -1) return;
@@ -158,7 +160,7 @@ public class ProvisionHandler extends AbstractCrudHandler
 
                     if (rows.isEmpty())
                     {
-                        handleNotFound(ctx, LOGGER);
+                        handleNotFound(ctx);
                     }
                     else
                     {
@@ -176,13 +178,13 @@ public class ProvisionHandler extends AbstractCrudHandler
                         handleSuccess(ctx, provision);
                     }
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
     @Override
     public void update(RoutingContext ctx)
     {
-        handleInvalidOperation(ctx, LOGGER, UPDATE_NOT_ALLOWED);
+        handleInvalidOperation(ctx, UPDATE_NOT_ALLOWED);
     }
 
     @Override
@@ -201,7 +203,7 @@ public class ProvisionHandler extends AbstractCrudHandler
 
                     if (rowCount == 0)
                     {
-                        handleNotFound(ctx, LOGGER);
+                        handleNotFound(ctx);
                     }
                     else
                     {
@@ -210,6 +212,6 @@ public class ProvisionHandler extends AbstractCrudHandler
                         handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                     }
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
     }
 }

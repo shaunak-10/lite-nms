@@ -2,11 +2,14 @@ package org.example.db;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.serviceproxy.ServiceBinder;
-import org.example.utils.LoggerUtil;
 
 public class DatabaseVerticle extends AbstractVerticle
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseVerticle.class);
+
     public static final String SERVICE_ADDRESS = "database.service";
 
     @Override
@@ -22,7 +25,8 @@ public class DatabaseVerticle extends AbstractVerticle
         }
         catch (Exception e)
         {
-            LoggerUtil.getMainLogger().severe(e.getMessage());
+
+            LOGGER.error(e.getMessage());
 
             startPromise.fail(e);
         }
@@ -31,7 +35,7 @@ public class DatabaseVerticle extends AbstractVerticle
     @Override
     public void stop(Promise<Void> stopPromise)
     {
-        LoggerUtil.getConsoleLogger().info("Stopping DatabaseVerticle");
+        LOGGER.info("Stopping DatabaseVerticle");
 
         stopPromise.complete();
     }

@@ -1,13 +1,14 @@
 package org.example.handlers;
 
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.example.db.DatabaseVerticle;
 import org.example.utils.EncryptionUtil;
-import org.example.utils.LoggerUtil;
 
 import java.util.List;
-import java.util.logging.Logger;
 
 import static org.example.constants.AppConstants.CredentialQuery.*;
 import static org.example.constants.AppConstants.CredentialField.*;
@@ -16,7 +17,7 @@ import static org.example.constants.AppConstants.Message.*;
 
 public class CredentialHandler extends AbstractCrudHandler
 {
-    private static final Logger LOGGER = LoggerUtil.getMainLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(CredentialHandler.class);
 
     private static final CredentialHandler INSTANCE = new CredentialHandler();
 
@@ -48,7 +49,7 @@ public class CredentialHandler extends AbstractCrudHandler
         }
         catch (Exception e)
         {
-            LOGGER.severe(e.getMessage());
+            LOGGER.error(e.getMessage());
         }
 
         executeQuery(ADD_CREDENTIAL, List.of(name, username, password))
@@ -69,7 +70,7 @@ public class CredentialHandler extends AbstractCrudHandler
                         handleSuccess(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS));
                     }
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_ADD, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
     }
 
     @Override
@@ -98,7 +99,7 @@ public class CredentialHandler extends AbstractCrudHandler
 
                     handleSuccess(ctx, new JsonObject().put(CREDENTIALS, credentialList));
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
     @Override
@@ -117,7 +118,7 @@ public class CredentialHandler extends AbstractCrudHandler
 
                     if (rows.isEmpty())
                     {
-                        handleNotFound(ctx, LOGGER);
+                        handleNotFound(ctx);
                     }
                     else
                     {
@@ -129,7 +130,7 @@ public class CredentialHandler extends AbstractCrudHandler
                                 .put(USERNAME, row.getString(USERNAME)));
                     }
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
     @Override
@@ -143,10 +144,6 @@ public class CredentialHandler extends AbstractCrudHandler
 
         if (notValidateCredentialFields(ctx, body)) return;
 
-        var name = body.getString(NAME);
-
-        var username = body.getString(USERNAME);
-
         var password = body.getString(PASSWORD);
 
         try
@@ -155,19 +152,19 @@ public class CredentialHandler extends AbstractCrudHandler
         }
         catch (Exception e)
         {
-            LOGGER.severe(e.getMessage());
+            LOGGER.error(e.getMessage());
         }
 
         LOGGER.info("Updating credential ID " + id + " with data: " + body.encode());
 
-        executeQuery(UPDATE_CREDENTIAL, List.of(name, username, password, id))
+        executeQuery(UPDATE_CREDENTIAL, List.of(body.getString(NAME), body.getString(USERNAME), password, id))
                 .onSuccess(result ->
                 {
                     var rowCount = result.getInteger("rowCount", 0);
 
                     if (rowCount == 0)
                     {
-                        handleNotFound(ctx, LOGGER);
+                        handleNotFound(ctx);
                     }
                     else
                     {
@@ -176,7 +173,7 @@ public class CredentialHandler extends AbstractCrudHandler
                         handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
                     }
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_UPDATE, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_UPDATE, cause));
     }
 
     @Override
@@ -195,7 +192,7 @@ public class CredentialHandler extends AbstractCrudHandler
 
                     if (rowCount == 0)
                     {
-                        handleNotFound(ctx, LOGGER);
+                        handleNotFound(ctx);
                     }
                     else
                     {
@@ -204,14 +201,14 @@ public class CredentialHandler extends AbstractCrudHandler
                         handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                     }
                 })
-                .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_DELETE, cause));
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
     }
 
     private boolean notValidateCredentialFields(RoutingContext ctx, JsonObject body)
     {
         if (body == null)
         {
-            handleMissingData(ctx, LOGGER, INVALID_JSON_BODY);
+            handleMissingData(ctx, INVALID_JSON_BODY);
 
             return true;
         }
@@ -224,7 +221,7 @@ public class CredentialHandler extends AbstractCrudHandler
 
         if (name == null || username == null || password == null)
         {
-            handleMissingData(ctx, LOGGER, MISSING_FIELDS);
+            handleMissingData(ctx, MISSING_FIELDS);
 
             return true;
         }

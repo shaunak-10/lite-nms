@@ -2,6 +2,8 @@ package org.example.server;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import io.vertx.core.Promise;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.JWTOptions;
 import io.vertx.ext.auth.KeyStoreOptions;
@@ -14,14 +16,13 @@ import org.example.routes.ProvisionRoutes;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
-import org.example.utils.LoggerUtil;
-
-import java.util.logging.Logger;
 
 import static org.example.constants.AppConstants.Headers.*;
 
 public class HttpServerVerticle extends AbstractVerticle
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(HttpServerVerticle.class);
+
     private static final Dotenv dotenv = Dotenv.load();
 
     @Override
@@ -41,6 +42,7 @@ public class HttpServerVerticle extends AbstractVerticle
 
             var jwtAuth = JWTAuth.create(vertx, jwtAuthOptions);
 
+            //demo login
             router.post("/login").handler(ctx ->
             {
                 var body = ctx.body().asJsonObject();
@@ -55,17 +57,60 @@ public class HttpServerVerticle extends AbstractVerticle
                             .put("username", username)
                             .put("role", "admin");
 
-                    var token = jwtAuth.generateToken(claims, new JWTOptions().setExpiresInMinutes(1000));
+                    // Access Token - short-lived
+                    var accessToken = jwtAuth.generateToken(claims, new JWTOptions().setExpiresInMinutes(15));
+
+                    // Refresh Token - long-lived
+                    var refreshToken = jwtAuth.generateToken(claims, new JWTOptions().setExpiresInMinutes(60 * 24 * 7)); // 7 days
 
                     ctx.response()
-                            .putHeader("Content-Type", "application/json")
-                            .end(new JsonObject().put("token", token).encodePrettily());
+                            .putHeader(CONTENT_TYPE, APPLICATION_JSON)
+                            .putHeader("Set-Cookie", "refresh_token=" + refreshToken +
+                                    "; HttpOnly; SameSite=Strict; Path=/refresh") // Secure in production
+                            .end(new JsonObject().put("access_token", accessToken).encodePrettily());
                 }
                 else
                 {
                     ctx.response().setStatusCode(401).end("Invalid credentials");
                 }
             });
+
+            router.post("/refresh").handler(ctx ->
+            {
+                var cookies = ctx.request().cookies();
+
+                var refreshCookie = cookies.stream()
+                        .filter(c -> c.getName().equals("refresh_token"))
+                        .findFirst();
+
+                if (refreshCookie.isEmpty())
+                {
+                    ctx.response().setStatusCode(401).end("Missing refresh token");
+
+                    return;
+                }
+
+                var refreshToken = refreshCookie.get().getValue();
+
+                jwtAuth.authenticate(new JsonObject().put("token", refreshToken)).onSuccess(user ->
+                {
+                    var claims = user.principal();
+
+                    var newAccessToken = jwtAuth.generateToken(
+                            new JsonObject()
+                                    .put("username", claims.getString("username"))
+                                    .put("role", claims.getString("role")),
+                            new JWTOptions().setExpiresInMinutes(15)
+                    );
+
+                    ctx.response()
+                            .putHeader("Content-Type", "application/json")
+                            .end(new JsonObject().put("access_token", newAccessToken).encodePrettily());
+                }).onFailure(err -> {
+                    ctx.response().setStatusCode(401).end("Invalid or expired refresh token");
+                });
+            });
+
 
             router.route("/credentials/*").handler(JWTAuthHandler.create(jwtAuth));
 
@@ -110,7 +155,7 @@ public class HttpServerVerticle extends AbstractVerticle
         }
         catch (Exception e)
         {
-            LoggerUtil.getMainLogger().severe(e.getMessage());
+            LOGGER.error(e.getMessage());
 
             startPromise.fail(e.getMessage());
         }

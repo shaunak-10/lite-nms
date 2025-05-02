@@ -8,9 +8,11 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.util.Base64;
 
-public class DecryptionUtil {
+public class DecryptionUtil
+{
 
     private static final Dotenv dotenv = Dotenv.load();
+
     private static final String SECRET_KEY = dotenv.get("ENCRYPTION_SECRET");
 
     private static final SecretKeySpec KEY_SPEC = new SecretKeySpec(

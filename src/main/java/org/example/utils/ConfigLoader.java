@@ -1,15 +1,16 @@
 package org.example.utils;
 
 import io.vertx.core.Vertx;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonObject;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.logging.Logger;
 
 public class ConfigLoader
 {
-    static Logger logger = LoggerUtil.getMainLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConfigLoader.class);
 
     private static JsonObject config;
 
@@ -23,7 +24,7 @@ public class ConfigLoader
         }
         catch (IOException e)
         {
-            logger.severe("Failed to load config file: " + e.getMessage());
+           LOGGER.error("Failed to load config file: " + e.getMessage());
         }
     }
 

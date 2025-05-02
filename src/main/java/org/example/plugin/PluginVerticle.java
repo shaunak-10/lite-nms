@@ -2,11 +2,13 @@ package org.example.plugin;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.serviceproxy.ServiceBinder;
-import org.example.utils.LoggerUtil;
 
 public class PluginVerticle extends AbstractVerticle
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PluginVerticle.class);
 
     public static final String SERVICE_ADDRESS = "plugin.service";
 
@@ -23,7 +25,7 @@ public class PluginVerticle extends AbstractVerticle
         }
         catch (Exception e)
         {
-            LoggerUtil.getMainLogger().severe(e.getMessage());
+            LOGGER.error(e.getMessage());
 
             startPromise.fail(e);
         }
@@ -32,7 +34,7 @@ public class PluginVerticle extends AbstractVerticle
     @Override
     public void stop(Promise<Void> stopPromise)
     {
-        LoggerUtil.getConsoleLogger().info("PluginVerticle stopped");
+        LOGGER.info("PluginVerticle stopped");
 
         stopPromise.complete();
     }

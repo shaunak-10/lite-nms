@@ -1,22 +1,21 @@
 package org.example.db;
 
 import io.vertx.core.Future;
-import io.vertx.core.Vertx;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.RowSet;
 import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
-import org.example.utils.LoggerUtil;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
 
 public class DatabaseServiceImpl implements DatabaseService
 {
-    private static final Logger LOGGER = LoggerUtil.getMainLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseServiceImpl.class);
 
     private static final SqlClient dbClient = DatabaseClient.getClient();
 
@@ -25,7 +24,7 @@ public class DatabaseServiceImpl implements DatabaseService
     {
         var query = request.getString("query");
 
-        LOGGER.info("Executing query: " + query);
+        LOGGER.trace("Executing query: " + query);
 
         if (request.containsKey("params"))
         {
@@ -129,7 +128,7 @@ public class DatabaseServiceImpl implements DatabaseService
 
     private Future<JsonObject> handleQueryError(Throwable error)
     {
-        LOGGER.severe("Database query failed: " + error.getMessage());
+        LOGGER.error("Database query failed: " + error.getMessage());
 
         return Future.failedFuture(
                 String.valueOf(new JsonObject()

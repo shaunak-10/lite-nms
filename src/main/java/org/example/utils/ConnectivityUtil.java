@@ -6,6 +6,7 @@ import io.vertx.core.json.JsonObject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
@@ -18,45 +19,36 @@ public class ConnectivityUtil
     {
         var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
 
-        var futures = new ArrayList<Future>();
+        var futures = new ArrayList<Future<Boolean>>();
 
-        var reachableDevices = new ArrayList<>();
+        var reachableDevices = new CopyOnWriteArrayList<JsonObject>();
 
-        for (int i = 0; i < devices.size(); i++)
+        for (var i = 0; i < devices.size(); i++)
         {
             var device = devices.getJsonObject(i);
 
-            var command = commandProvider.apply(device);
-
-            var promise = Promise.promise();
-
-            futures.add(promise.future());
-
-            vertx.executeBlocking(execPromise ->
+            var future = vertx.executeBlocking(() ->
             {
                 Process process = null;
 
                 try
                 {
-                    ProcessBuilder builder = new ProcessBuilder(command);
-
-                    process = builder.start();
+                    process = new ProcessBuilder(commandProvider.apply(device)).start();
 
                     var exitCode = process.waitFor(timeout, TimeUnit.SECONDS) ? process.exitValue() : -1;
 
                     if (exitCode == 0)
                     {
-                        synchronized (reachableDevices)
-                        {
-                            reachableDevices.add(device);
-                        }
+                        reachableDevices.add(device);
+
+                        return true;
                     }
 
-                    execPromise.complete();
+                    return false;
                 }
                 catch (Exception e)
                 {
-                    execPromise.fail(e.getMessage());
+                    throw new Exception(e.getMessage());
                 }
                 finally
                 {
@@ -65,18 +57,13 @@ public class ConnectivityUtil
                         process.destroy();
                     }
                 }
-            }, false, res ->
-            {
-                if (res.failed())
-                {
-                    promise.fail(res.cause());
-                }
+            }, false);
 
-                promise.complete();
-            });
+            futures.add(future);
         }
 
-        return CompositeFuture.all(futures)
+        // Join all the futures together
+        return Future.join(futures)
                 .map(v -> new JsonArray(reachableDevices));
     }
 }

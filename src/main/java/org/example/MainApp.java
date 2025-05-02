@@ -2,13 +2,14 @@ package org.example;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import org.example.db.DatabaseClient;
 import org.example.db.DatabaseVerticle;
 import org.example.plugin.PluginVerticle;
 import org.example.scheduler.SchedulerVerticle;
 import org.example.server.HttpServerVerticle;
 import org.example.utils.ConfigLoader;
-import org.example.utils.LoggerUtil;
 
 import java.util.List;
 
@@ -17,6 +18,8 @@ import static org.example.constants.AppConstants.AddressesAndPaths.CONFIG_FILE_P
 public class MainApp
 {
     public static Vertx vertx = Vertx.vertx();
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MainApp.class);
 
     public static void main(String[] args)
     {
@@ -28,32 +31,32 @@ public class MainApp
 
                 if (dbRes.failed())
                 {
-                    System.err.println("❌ Failed to connect to DB: " + dbRes.cause());
+                    LOGGER.error("❌ Failed to connect to DB: " + dbRes.cause());
 
                     vertx.close();
 
                     return;
                 }
 
-                LoggerUtil.getConsoleLogger().info("✅ Database connected successfully!");
+                LOGGER.info("✅ Database connected successfully!");
 
                 DatabaseClient.createTablesIfNotExist(tableRes ->
                 {
                     if (tableRes.failed())
                     {
-                        LoggerUtil.getConsoleLogger().severe("❌ Failed to create tables: " + tableRes.cause().getMessage());
+                        LOGGER.error("❌ Failed to create tables: " + tableRes.cause().getMessage());
 
                         vertx.close();
 
                         return;
                     }
 
-                    LoggerUtil.getConsoleLogger().info("📦 Tables created or already exist.");
+                    LOGGER.info("📦 Tables created or already exist.");
 
                     deployAllVerticles(vertx)
-                            .onSuccess(v -> LoggerUtil.getConsoleLogger().info("🚀 All verticles deployed successfully!"))
+                            .onSuccess(v -> LOGGER.info("🚀 All verticles deployed successfully!"))
                             .onFailure(err -> {
-                                LoggerUtil.getConsoleLogger().severe("❌ Failed to deploy verticles: " + err.getMessage());
+                                LOGGER.error("❌ Failed to deploy verticles: " + err.getMessage());
                                 vertx.close();
                             });
                 });
@@ -61,7 +64,7 @@ public class MainApp
         }
         catch (Exception ex)
         {
-            LoggerUtil.getConsoleLogger().severe(ex.getMessage());
+            LOGGER.error(ex.getMessage());
         }
     }
 
@@ -81,7 +84,7 @@ public class MainApp
             chain = chain.compose(ignored ->
                     vertx.deployVerticle(verticle.getName())
                             .onSuccess(id ->
-                                    LoggerUtil.getConsoleLogger().info("✅ Deployed: " + verticle.getSimpleName()))
+                                    LOGGER.info("✅ Deployed: " + verticle.getSimpleName()))
                             .mapEmpty()
             );
         }

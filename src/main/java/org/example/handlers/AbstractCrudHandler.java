@@ -1,6 +1,8 @@
 package org.example.handlers;
 
 import io.vertx.core.Future;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
@@ -9,7 +11,6 @@ import org.example.db.DatabaseVerticle;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Logger;
 
 import static org.example.MainApp.vertx;
 import static org.example.constants.AppConstants.JsonKey.*;
@@ -18,6 +19,8 @@ import static org.example.constants.AppConstants.Headers.*;
 
 public abstract class AbstractCrudHandler
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractCrudHandler.class);
+
     DatabaseService databaseService = DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS);
 
     public abstract void add(RoutingContext ctx);
@@ -60,9 +63,9 @@ public abstract class AbstractCrudHandler
         }
     }
 
-    protected void handleDatabaseError(RoutingContext ctx, Logger logger, String message, Throwable cause)
+    protected void handleDatabaseError(RoutingContext ctx, String message, Throwable cause)
     {
-        logger.severe(message + ": " + cause.getMessage());
+        LOGGER.error(message + ": " + cause.getMessage());
 
         ctx.response()
                 .setStatusCode(500)
@@ -73,9 +76,9 @@ public abstract class AbstractCrudHandler
                         .encodePrettily());
     }
 
-    protected void handleNotFound(RoutingContext ctx, Logger logger)
+    protected void handleNotFound(RoutingContext ctx)
     {
-        logger.warning(org.example.constants.AppConstants.Message.NOT_FOUND);
+        LOGGER.warn(org.example.constants.AppConstants.Message.NOT_FOUND);
 
         ctx.response()
                 .setStatusCode(404)
@@ -83,9 +86,9 @@ public abstract class AbstractCrudHandler
                 .end(new JsonObject().put(ERROR, org.example.constants.AppConstants.Message.NOT_FOUND).encodePrettily());
     }
 
-    protected void handleMissingData(RoutingContext ctx, Logger logger, String message)
+    protected void handleMissingData(RoutingContext ctx, String message)
     {
-        logger.warning(message);
+        LOGGER.warn(message);
 
         ctx.response()
                 .setStatusCode(400)
@@ -109,9 +112,9 @@ public abstract class AbstractCrudHandler
                 .end(response.encodePrettily());
     }
 
-    protected void handleInvalidData(RoutingContext ctx, Logger logger, String message)
+    protected void handleInvalidData(RoutingContext ctx, String message)
     {
-        logger.warning(message);
+        LOGGER.warn(message);
 
         ctx.response()
                 .setStatusCode(400)
@@ -119,9 +122,9 @@ public abstract class AbstractCrudHandler
                 .end(new JsonObject().put(ERROR, message).encodePrettily());
     }
 
-    protected void handleInvalidOperation(RoutingContext ctx, Logger logger, String message)
+    protected void handleInvalidOperation(RoutingContext ctx, String message)
     {
-        logger.warning(message);
+        LOGGER.warn(message);
 
         ctx.response()
                 .setStatusCode(405)

@@ -2,10 +2,11 @@ package org.example.plugin;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import java.io.*;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 
 import static org.example.constants.AppConstants.AddressesAndPaths.PLUGIN_PATH;
 import static org.example.constants.AppConstants.ConfigKeys.PROCESS;
@@ -16,11 +17,10 @@ import org.example.MainApp;
 import org.example.utils.ConfigLoader;
 import org.example.utils.DecryptionUtil;
 import org.example.utils.EncryptionUtil;
-import org.example.utils.LoggerUtil;
 
 public class PluginServiceImpl implements PluginService
 {
-    private static final Logger LOGGER = LoggerUtil.getPluginLogger();
+    private static final Logger LOGGER = LoggerFactory.getLogger(PluginServiceImpl.class);
 
     private final Vertx vertx;
 
@@ -58,11 +58,7 @@ public class PluginServiceImpl implements PluginService
 
                 try (var writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream())))
                 {
-                    System.out.println(devices.encode());
-
                     var encryptedInput = EncryptionUtil.encrypt(devices.encode());
-
-                    System.out.println(encryptedInput);
 
                     writer.write(encryptedInput);
 
@@ -73,22 +69,18 @@ public class PluginServiceImpl implements PluginService
 
                 try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
                 {
-                    String line;
+                    var line = "";
 
                     while ((line = reader.readLine()) != null) {
                         try
                         {
-                            System.out.println(line);
-
-                            String decrypted = DecryptionUtil.decrypt(line);
-
-                            System.out.println(decrypted);
+                            var decrypted = DecryptionUtil.decrypt(line);
 
                             devicesFromPlugin.add(new JsonObject(decrypted));
                         }
                         catch (Exception e)
                         {
-                            LOGGER.severe("Decryption failed for plugin output: " + e.getMessage());
+                            LOGGER.error("Decryption failed for plugin output: " + e.getMessage());
                         }
                     }
 
@@ -106,7 +98,7 @@ public class PluginServiceImpl implements PluginService
 
                     try (var errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream())))
                     {
-                        String errLine;
+                        var errLine = "";
 
                         while ((errLine = errorReader.readLine()) != null)
                         {
@@ -116,14 +108,14 @@ public class PluginServiceImpl implements PluginService
 
                     var errorMsg = "Plugin error (exit code " + exitCode + "): " + errorOutput;
 
-                    LOGGER.severe(errorMsg);
+                    LOGGER.error(errorMsg);
 
                     throw new Exception(errorMsg);
                 }
             }
             catch (Exception e)
             {
-                LOGGER.severe("Plugin execution error: " + e.getMessage());
+                LOGGER.error("Plugin execution error: " + e.getMessage());
 
                 throw new RuntimeException(e);
             }

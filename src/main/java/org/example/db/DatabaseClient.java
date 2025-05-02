@@ -4,14 +4,18 @@ import io.github.cdimascio.dotenv.Dotenv;
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.sqlclient.PoolOptions;
 import io.vertx.sqlclient.SqlClient;
 import io.vertx.pgclient.PgBuilder;
-import org.example.utils.LoggerUtil;
+
 
 public class DatabaseClient
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseClient.class);
+
     private static final Dotenv dotenv = Dotenv.load();
 
     private static SqlClient client;
@@ -40,7 +44,7 @@ public class DatabaseClient
             }
             catch (Exception ex)
             {
-                LoggerUtil.getMainLogger().severe(ex.getMessage());
+                LOGGER.error(ex.getMessage());
             }
         }
         return client;
@@ -153,7 +157,7 @@ public class DatabaseClient
             }
             else
             {
-                LoggerUtil.getMainLogger().severe("Failed to execute query: " + ar.cause().getMessage());
+                LOGGER.error("Failed to execute query: " + ar.cause().getMessage());
 
                 resultHandler.handle(Future.failedFuture(ar.cause()));
             }
