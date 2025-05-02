@@ -8,9 +8,9 @@ import io.vertx.core.json.JsonObject;
 @ProxyGen
 public interface DatabaseService
 {
-    static DatabaseService create(Vertx vertx)
+    static DatabaseService create()
     {
-        return new DatabaseServiceImpl(vertx);
+        return new DatabaseServiceImpl();
     }
 
     static DatabaseService createProxy(Vertx vertx, String address)

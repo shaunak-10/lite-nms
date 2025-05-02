@@ -11,8 +11,11 @@ import static org.example.constants.AppConstants.AddressesAndPaths.PLUGIN_PATH;
 import static org.example.constants.AppConstants.ConfigKeys.PROCESS;
 import static org.example.constants.AppConstants.PingConstants.TIMEOUT;
 
+import io.vertx.core.json.JsonObject;
 import org.example.MainApp;
 import org.example.utils.ConfigLoader;
+import org.example.utils.DecryptionUtil;
+import org.example.utils.EncryptionUtil;
 import org.example.utils.LoggerUtil;
 
 public class PluginServiceImpl implements PluginService
@@ -52,30 +55,50 @@ public class PluginServiceImpl implements PluginService
 
                 process = pb.start();
 
+
                 try (var writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream())))
                 {
-                    writer.write(devices.encode());
+                    System.out.println(devices.encode());
+
+                    var encryptedInput = EncryptionUtil.encrypt(devices.encode());
+
+                    System.out.println(encryptedInput);
+
+                    writer.write(encryptedInput);
 
                     writer.flush();
                 }
 
-                var output = new StringBuilder();
+                var devicesFromPlugin = new JsonArray();
 
                 try (var reader = new BufferedReader(new InputStreamReader(process.getInputStream())))
                 {
                     String line;
 
-                    while ((line = reader.readLine()) != null)
-                    {
-                        output.append(line);
+                    while ((line = reader.readLine()) != null) {
+                        try
+                        {
+                            System.out.println(line);
+
+                            String decrypted = DecryptionUtil.decrypt(line);
+
+                            System.out.println(decrypted);
+
+                            devicesFromPlugin.add(new JsonObject(decrypted));
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.severe("Decryption failed for plugin output: " + e.getMessage());
+                        }
                     }
+
                 }
 
                 var exitCode = process.waitFor(timeout, TimeUnit.SECONDS) ? process.exitValue() : -1;
 
                 if (exitCode == 0)
                 {
-                    return new JsonArray(output.toString());
+                    return devicesFromPlugin;
                 }
                 else
                 {
@@ -95,7 +118,7 @@ public class PluginServiceImpl implements PluginService
 
                     LOGGER.severe(errorMsg);
 
-                    throw new RuntimeException(errorMsg);
+                    throw new Exception(errorMsg);
                 }
             }
             catch (Exception e)

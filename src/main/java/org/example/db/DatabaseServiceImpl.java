@@ -16,15 +16,9 @@ import java.util.logging.Logger;
 
 public class DatabaseServiceImpl implements DatabaseService
 {
-
     private static final Logger LOGGER = LoggerUtil.getMainLogger();
 
-    private final SqlClient dbClient;
-
-    public DatabaseServiceImpl(Vertx vertx)
-    {
-        this.dbClient = DatabaseClient.getClient();
-    }
+    private static final SqlClient dbClient = DatabaseClient.getClient();
 
     @Override
     public Future<JsonObject> executeQuery(JsonObject request)

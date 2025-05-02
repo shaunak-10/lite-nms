@@ -129,6 +129,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                                 .put(IP, row.getString(IP))
                                 .put(PORT, row.getInteger(PORT))
                                 .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
+                                .put("availability_percent", row.getDouble("availability_percent", 0.0))
                                 .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
 
                         provisionList.add(provision);
@@ -169,6 +170,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                                 .put(IP, row.getString(IP))
                                 .put(PORT, row.getInteger(PORT))
                                 .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
+                                .put("availability_percent", row.getDouble("availability_percent", 0.0))
                                 .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
 
                         handleSuccess(ctx, provision);
@@ -176,8 +178,6 @@ public class ProvisionHandler extends AbstractCrudHandler
                 })
                 .onFailure(cause -> handleDatabaseError(ctx, LOGGER, FAILED_TO_FETCH, cause));
     }
-
-
 
     @Override
     public void update(RoutingContext ctx)

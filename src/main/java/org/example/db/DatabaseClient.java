@@ -82,7 +82,7 @@ public class DatabaseClient
                 name VARCHAR(100) UNIQUE NOT NULL,
                 username VARCHAR(100) NOT NULL,
                 password VARCHAR(100) NOT NULL
-            )
+            );
             """,
                 """
             CREATE TABLE IF NOT EXISTS discovery_profile (
@@ -95,7 +95,7 @@ public class DatabaseClient
                 FOREIGN KEY (credential_profile_id)
                     REFERENCES credential_profile(id)
                     ON DELETE RESTRICT
-            )
+            );
             """,
                 """
             CREATE TABLE IF NOT EXISTS provisioned_device (
@@ -107,7 +107,7 @@ public class DatabaseClient
                 FOREIGN KEY (credential_profile_id)
                     REFERENCES credential_profile(id)
                     ON DELETE RESTRICT
-            )
+            );
             """,
                 """
             CREATE TABLE IF NOT EXISTS polling_result (
@@ -118,13 +118,22 @@ public class DatabaseClient
                 FOREIGN KEY (provisioned_device_id)
                     REFERENCES provisioned_device(id)
                     ON DELETE CASCADE
-            )
+            );
+            """,
+                """
+            CREATE TABLE IF NOT EXISTS availability (
+                 id SERIAL PRIMARY KEY,
+                 provisioned_device_id INTEGER NOT NULL,
+                 checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                 was_available BOOLEAN NOT NULL,
+                 FOREIGN KEY (provisioned_device_id)
+                     REFERENCES provisioned_device(id)
+                     ON DELETE CASCADE
+             );
             """
         };
 
-        SqlClient sqlClient = getClient();
-
-        executeSequentially(sqlClient, statements, 0, resultHandler);
+        executeSequentially(getClient(), statements, 0, resultHandler);
     }
 
     private static void executeSequentially(SqlClient client, String[] queries, int index, Handler<AsyncResult<Void>> resultHandler)
@@ -145,6 +154,7 @@ public class DatabaseClient
             else
             {
                 LoggerUtil.getMainLogger().severe("Failed to execute query: " + ar.cause().getMessage());
+
                 resultHandler.handle(Future.failedFuture(ar.cause()));
             }
         });

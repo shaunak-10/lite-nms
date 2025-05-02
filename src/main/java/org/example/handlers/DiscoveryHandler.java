@@ -397,7 +397,6 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                         })
                                         .onSuccess(sshResults ->
                                         {
-
                                             Map<Integer, Boolean> sshReachabilityMap = new HashMap<>();
 
                                             for (int i = 0; i < sshResults.size(); i++)

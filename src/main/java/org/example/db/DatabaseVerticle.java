@@ -3,7 +3,6 @@ package org.example.db;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.serviceproxy.ServiceBinder;
-import org.example.plugin.PluginService;
 import org.example.utils.LoggerUtil;
 
 public class DatabaseVerticle extends AbstractVerticle
@@ -17,7 +16,7 @@ public class DatabaseVerticle extends AbstractVerticle
         {
             new ServiceBinder(vertx)
                     .setAddress(SERVICE_ADDRESS)
-                    .register(DatabaseService.class, DatabaseService.create(vertx));
+                    .register(DatabaseService.class, DatabaseService.create());
 
             startPromise.complete();
         }

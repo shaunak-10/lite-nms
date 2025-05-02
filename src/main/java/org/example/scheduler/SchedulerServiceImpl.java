@@ -16,12 +16,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
-import static org.example.constants.AppConstants.ProvisionQuery.DATA_TO_PLUGIN_FOR_POLLING;
-import static org.example.constants.AppConstants.ProvisionQuery.INSERT_POLLING_RESULT;
 import static org.example.constants.AppConstants.ProvisionField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
+import static org.example.constants.AppConstants.ProvisionQuery.*;
 
 public class SchedulerServiceImpl implements SchedulerService {
 
@@ -114,6 +114,29 @@ public class SchedulerServiceImpl implements SchedulerService {
 
                                         return;
                                     }
+
+                                    var availabilityParams = new ArrayList<>();
+
+                                    var reachableIds = pingedDevices.stream()
+                                            .map(dev -> ((JsonObject) dev).getInteger(ID))
+                                            .collect(Collectors.toSet());
+
+                                    for (var i = 0; i < devices.size(); i++)
+                                    {
+                                        var device = devices.getJsonObject(i);
+
+                                        var deviceId = device.getInteger(ID);
+
+                                        var wasAvailable = reachableIds.contains(deviceId);
+
+                                        availabilityParams.add(List.of(deviceId, wasAvailable));
+                                    }
+
+                                    databaseService.executeBatch(new JsonObject()
+                                                    .put("query", ADD_AVAILABILITY_DATA)
+                                                    .put("params", new JsonArray(availabilityParams)))
+                                            .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
+                                            .onFailure(err -> LOGGER.warning("Availability insert failed: " + err.getMessage()));
 
                                     pluginService.runSSHMetrics(pingedDevices)
                                             .onSuccess(metricsResults ->

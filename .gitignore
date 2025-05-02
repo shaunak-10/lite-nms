@@ -42,3 +42,5 @@ build/
 .env.*
 
 /logs
+
+/src/main/java/org/example/plugin_executable/go_config.json

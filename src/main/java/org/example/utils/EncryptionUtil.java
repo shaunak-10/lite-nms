@@ -3,7 +3,10 @@ package org.example.utils;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
+import java.security.SecureRandom;
 import java.util.Base64;
 
 public class EncryptionUtil
@@ -20,10 +23,29 @@ public class EncryptionUtil
 
     public static String encrypt(String plainText) throws Exception
     {
-        var cipher = Cipher.getInstance("AES");
+        var cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 
-        cipher.init(Cipher.ENCRYPT_MODE, KEY_SPEC);
+        // Generate random IV
+        var iv = new byte[16];
 
-        return Base64.getEncoder().encodeToString(cipher.doFinal(plainText.getBytes()));
+        var random = new SecureRandom();
+
+        random.nextBytes(iv);
+
+        var ivSpec = new IvParameterSpec(iv);
+
+        // Encrypt
+        cipher.init(Cipher.ENCRYPT_MODE, KEY_SPEC, ivSpec);
+
+        var encrypted = cipher.doFinal(plainText.getBytes());
+
+        // Prepend IV to ciphertext
+        var byteBuffer = ByteBuffer.allocate(16 + encrypted.length);
+
+        byteBuffer.put(iv);
+
+        byteBuffer.put(encrypted);
+
+        return Base64.getEncoder().encodeToString(byteBuffer.array());
     }
 }
