@@ -1,4 +1,4 @@
-package org.example.scheduler;
+package org.example.services.scheduler;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;

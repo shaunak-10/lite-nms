@@ -1,4 +1,4 @@
-package org.example.scheduler;
+package org.example.services.scheduler;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -6,10 +6,10 @@ import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import org.example.db.DatabaseService;
-import org.example.db.DatabaseVerticle;
-import org.example.plugin.PluginService;
-import org.example.plugin.PluginVerticle;
+import org.example.services.db.DatabaseService;
+import org.example.services.db.DatabaseVerticle;
+import org.example.services.plugin.PluginService;
+import org.example.services.plugin.PluginVerticle;
 import org.example.utils.DecryptionUtil;
 import org.example.utils.PingUtil;
 
@@ -109,13 +109,6 @@ public class SchedulerServiceImpl implements SchedulerService
                                 .onFailure(err -> LOGGER.error("Ping filtering failed: " + err.getMessage()))
                                 .onSuccess(pingedDevices ->
                                 {
-                                    if (pingedDevices.isEmpty())
-                                    {
-                                        LOGGER.info("No devices reachable via ping. Skipping polling.");
-
-                                        return;
-                                    }
-
                                     var availabilityParams = new ArrayList<>();
 
                                     var reachableIds = pingedDevices.stream()
@@ -124,13 +117,9 @@ public class SchedulerServiceImpl implements SchedulerService
 
                                     for (var i = 0; i < devices.size(); i++)
                                     {
-                                        var device = devices.getJsonObject(i);
+                                        var deviceId = devices.getJsonObject(i).getInteger(ID);
 
-                                        var deviceId = device.getInteger(ID);
-
-                                        var wasAvailable = reachableIds.contains(deviceId);
-
-                                        availabilityParams.add(List.of(deviceId, wasAvailable));
+                                        availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
                                     }
 
                                     databaseService.executeBatch(new JsonObject()
@@ -138,6 +127,13 @@ public class SchedulerServiceImpl implements SchedulerService
                                                     .put("params", new JsonArray(availabilityParams)))
                                             .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
                                             .onFailure(err -> LOGGER.error("Availability insert failed: " + err.getMessage()));
+
+                                    if (pingedDevices.isEmpty())
+                                    {
+                                        LOGGER.info("No devices reachable via ping. Skipping SSH polling.");
+
+                                        return;
+                                    }
 
                                     pluginService.runSSHMetrics(pingedDevices)
                                             .onSuccess(metricsResults ->

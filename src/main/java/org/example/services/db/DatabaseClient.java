@@ -1,4 +1,4 @@
-package org.example.db;
+package org.example.services.db;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import io.vertx.core.AsyncResult;

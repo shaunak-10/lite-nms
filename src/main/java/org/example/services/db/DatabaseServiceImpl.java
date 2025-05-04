@@ -1,4 +1,4 @@
-package org.example.db;
+package org.example.services.db;
 
 import io.vertx.core.Future;
 import io.vertx.core.impl.logging.Logger;

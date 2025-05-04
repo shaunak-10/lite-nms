@@ -1,7 +1,7 @@
-package org.example.routes;
+package org.example.services.server.routes;
 
 import io.vertx.ext.web.Router;
-import org.example.handlers.DiscoveryHandler;
+import org.example.services.server.handlers.DiscoveryHandler;
 import static org.example.constants.AppConstants.Routes.*;
 
 public class DiscoveryRoutes

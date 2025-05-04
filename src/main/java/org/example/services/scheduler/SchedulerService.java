@@ -1,4 +1,4 @@
-package org.example.scheduler;
+package org.example.services.scheduler;
 
 import io.vertx.codegen.annotations.ProxyGen;
 import io.vertx.core.Future;

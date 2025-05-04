@@ -1,4 +1,4 @@
-package org.example.handlers;
+package org.example.services.server.handlers;
 
 import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;

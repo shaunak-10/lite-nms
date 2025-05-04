@@ -1,12 +1,12 @@
-package org.example.handlers;
+package org.example.services.server.handlers;
 
 import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import org.example.plugin.PluginService;
-import org.example.plugin.PluginVerticle;
+import org.example.services.plugin.PluginService;
+import org.example.services.plugin.PluginVerticle;
 import org.example.utils.*;
 
 import java.util.*;
@@ -116,59 +116,6 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             handleInvalidData(ctx, INVALID_JSON_BODY);
         }
-    }
-
-    private void fetchDeviceDetailsAndRunDiscovery(RoutingContext ctx, int id, String ip, int port, int credentialProfileId)
-    {
-        // Query to fetch username and password based on credentialProfileId
-        var query = "SELECT username, password FROM credential_profile WHERE id = $1";
-
-        executeQuery(query, List.of(credentialProfileId))
-                .onSuccess(result ->
-                {
-                    var rows = result.getJsonArray("rows", new JsonArray());
-
-                    if (rows.isEmpty())
-                    {
-                        LOGGER.warn("No credentials found for credentialProfileId: " + credentialProfileId);
-
-                        return;
-                    }
-
-                    var row = rows.getJsonObject(0);
-
-                    var password = "";
-
-                    try
-                    {
-                        password = DecryptionUtil.decrypt(row.getString(PASSWORD));
-                    }
-                    catch (Exception e)
-                    {
-                        LOGGER.error("Failed to decrypt password: " + e.getMessage());
-
-                        return;
-                    }
-
-                    // Construct device JSON object
-                    var device = new JsonObject()
-                            .put(ID, id)
-                            .put(IP, ip)
-                            .put(PORT, port)
-                            .put(USERNAME, row.getString(USERNAME))
-                            .put(PASSWORD, password);
-
-                    var devices = new JsonArray().add(device);
-
-                    var defaultResults = new JsonArray().add(new JsonObject()
-                            .put(ID, id)
-                            .put("reachable", false));
-
-                    // Run discovery for the single device
-                    startDiscoveryPipeline(ctx, devices, defaultResults);
-                })
-                .onFailure(cause ->
-                        LOGGER.error("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage()));
     }
 
     @Override
@@ -445,13 +392,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                         {
                                             var deviceResult = defaultResults.getJsonObject(0);
 
-                                            var id = deviceResult.getInteger(ID);
+                                            deviceResult.put("reachable", sshResults.getJsonObject(0).getBoolean("reachable"));
 
-                                            var reachable = sshResults.getJsonObject(0).getBoolean("reachable");
-
-                                            deviceResult.put("reachable", reachable);
-
-                                            LOGGER.info("Discovery completed. Updating status for device ID: " + id);
+                                            LOGGER.info("Discovery completed. Updating status for device ID: " + deviceResult.getInteger(ID));
 
                                             updateDiscoveryStatus(ctx, defaultResults);
                                         });
@@ -488,6 +431,58 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 });
     }
 
+    private void fetchDeviceDetailsAndRunDiscovery(RoutingContext ctx, int id, String ip, int port, int credentialProfileId)
+    {
+        // Query to fetch username and password based on credentialProfileId
+        var query = "SELECT username, password FROM credential_profile WHERE id = $1";
+
+        executeQuery(query, List.of(credentialProfileId))
+                .onSuccess(result ->
+                {
+                    var rows = result.getJsonArray("rows", new JsonArray());
+
+                    if (rows.isEmpty())
+                    {
+                        LOGGER.warn("No credentials found for credentialProfileId: " + credentialProfileId);
+
+                        return;
+                    }
+
+                    var row = rows.getJsonObject(0);
+
+                    var password = "";
+
+                    try
+                    {
+                        password = DecryptionUtil.decrypt(row.getString(PASSWORD));
+                    }
+                    catch (Exception e)
+                    {
+                        LOGGER.error("Failed to decrypt password: " + e.getMessage());
+
+                        return;
+                    }
+
+                    // Construct device JSON object
+                    var device = new JsonObject()
+                            .put(ID, id)
+                            .put(IP, ip)
+                            .put(PORT, port)
+                            .put(USERNAME, row.getString(USERNAME))
+                            .put(PASSWORD, password);
+
+                    var devices = new JsonArray().add(device);
+
+                    var defaultResults = new JsonArray().add(new JsonObject()
+                            .put(ID, id)
+                            .put("reachable", false));
+
+                    // Run discovery for the single device
+                    startDiscoveryPipeline(ctx, devices, defaultResults);
+                })
+                .onFailure(cause ->
+                        LOGGER.error("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage()));
+    }
 
     public static boolean isNotValidPort(int port)
     {

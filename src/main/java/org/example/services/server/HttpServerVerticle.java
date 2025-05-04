@@ -1,4 +1,4 @@
-package org.example.server;
+package org.example.services.server;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import io.vertx.core.Promise;
@@ -10,9 +10,9 @@ import io.vertx.ext.auth.KeyStoreOptions;
 import io.vertx.ext.auth.jwt.JWTAuth;
 import io.vertx.ext.auth.jwt.JWTAuthOptions;
 import io.vertx.ext.web.handler.JWTAuthHandler;
-import org.example.routes.CredentialRoutes;
-import org.example.routes.DiscoveryRoutes;
-import org.example.routes.ProvisionRoutes;
+import org.example.services.server.routes.CredentialRoutes;
+import org.example.services.server.routes.DiscoveryRoutes;
+import org.example.services.server.routes.ProvisionRoutes;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;

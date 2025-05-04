@@ -4,11 +4,11 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;
-import org.example.db.DatabaseClient;
-import org.example.db.DatabaseVerticle;
-import org.example.plugin.PluginVerticle;
-import org.example.scheduler.SchedulerVerticle;
-import org.example.server.HttpServerVerticle;
+import org.example.services.db.DatabaseClient;
+import org.example.services.db.DatabaseVerticle;
+import org.example.services.plugin.PluginVerticle;
+import org.example.services.scheduler.SchedulerVerticle;
+import org.example.services.server.HttpServerVerticle;
 import org.example.utils.ConfigLoader;
 
 import java.util.List;

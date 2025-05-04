@@ -1,4 +1,4 @@
-package org.example.plugin;
+package org.example.services.plugin;
 
 import io.vertx.codegen.annotations.ProxyGen;
 import io.vertx.core.Future;

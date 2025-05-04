@@ -1,6 +1,6 @@
 @io.vertx.codegen.annotations.ModuleGen(
-        groupPackage = "org.example.db",
+        groupPackage = "org.example.services.db",
         name = "database-service",
         useFutures = true
 )
-package org.example.db;
+package org.example.services.db;

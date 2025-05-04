@@ -1,11 +1,10 @@
-package org.example.handlers;
+package org.example.services.server.handlers;
 
 import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import org.example.db.DatabaseVerticle;
 import org.example.utils.EncryptionUtil;
 
 import java.util.List;

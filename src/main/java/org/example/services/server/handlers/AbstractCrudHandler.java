@@ -1,4 +1,4 @@
-package org.example.handlers;
+package org.example.services.server.handlers;
 
 import io.vertx.core.Future;
 import io.vertx.core.impl.logging.Logger;
@@ -6,8 +6,8 @@ import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import org.example.db.DatabaseService;
-import org.example.db.DatabaseVerticle;
+import org.example.services.db.DatabaseService;
+import org.example.services.db.DatabaseVerticle;
 
 import java.util.Collections;
 import java.util.List;
