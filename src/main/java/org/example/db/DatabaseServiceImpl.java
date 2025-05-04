@@ -22,32 +22,45 @@ public class DatabaseServiceImpl implements DatabaseService
     @Override
     public Future<JsonObject> executeQuery(JsonObject request)
     {
-        var query = request.getString("query");
-
-        LOGGER.trace("Executing query: " + query);
-
-        if (request.containsKey("params"))
+        if(dbClient == null)
         {
-            var paramsArray = request.getJsonArray("params");
+            LOGGER.error("Database client is not initialized.");
 
-            var params = Tuple.tuple();
-
-            for (var param : paramsArray)
-            {
-                params.addValue(param);
-            }
-
-            return dbClient.preparedQuery(query)
-                    .execute(params)
-                    .map(this::processQueryResult)
-                    .recover(this::handleQueryError);
+            return Future.failedFuture(
+                    String.valueOf(new JsonObject()
+                            .put("success", false)
+                            .put("error", "Database client is not initialized"))
+            );
         }
         else
         {
-            return dbClient.preparedQuery(query)
-                    .execute()
-                    .map(this::processQueryResult)
-                    .recover(this::handleQueryError);
+            var query = request.getString("query");
+
+            LOGGER.trace("Executing query: " + query);
+
+            if (request.containsKey("params"))
+            {
+                var paramsArray = request.getJsonArray("params");
+
+                var params = Tuple.tuple();
+
+                for (var param : paramsArray)
+                {
+                    params.addValue(param);
+                }
+
+                return dbClient.preparedQuery(query)
+                        .execute(params)
+                        .map(this::processQueryResult)
+                        .recover(this::handleQueryError);
+            }
+            else
+            {
+                return dbClient.preparedQuery(query)
+                        .execute()
+                        .map(this::processQueryResult)
+                        .recover(this::handleQueryError);
+            }
         }
     }
 
@@ -104,18 +117,33 @@ public class DatabaseServiceImpl implements DatabaseService
 
         for (var row : result)
         {
-            var jsonRow = new JsonObject();
-
-            for (var i = 0; i < row.size(); i++)
+            try
             {
-                var columnName = row.getColumnName(i);
+                var jsonRow = new JsonObject();
 
-                var value = row.getValue(i);
+                for (var i = 0; i < row.size(); i++)
+                {
+                    try
+                    {
+                        var columnName = row.getColumnName(i);
 
-                jsonRow.put(columnName, value);
+                        var value = row.getValue(i);
+
+                        jsonRow.put(columnName, value);
+                    }
+                    catch (Exception e)
+                    {
+                        LOGGER.error(e.getMessage());
+                    }
+
+                }
+
+                rows.add(jsonRow);
             }
-
-            rows.add(jsonRow);
+            catch (Exception e)
+            {
+                LOGGER.error(e.getMessage());
+            }
         }
 
         if (!rows.isEmpty())

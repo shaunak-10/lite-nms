@@ -9,10 +9,7 @@ import org.example.plugin.PluginService;
 import org.example.plugin.PluginVerticle;
 import org.example.utils.*;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
@@ -352,6 +349,57 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
     }
 
+    public void runDiscovery(RoutingContext ctx)
+    {
+        var id = validateIdFromPath(ctx);
+
+        if (id == -1) return;
+
+        LOGGER.info("running discovery profile ID: " + id);
+
+        executeQuery(DATA_TO_PLUGIN_FOR_DISCOVERY, List.of(id))
+                .onSuccess(dbRes ->
+                {
+                    try
+                    {
+                        var rows = dbRes.getJsonArray("rows", new JsonArray());
+
+                        if (rows.isEmpty())
+                        {
+                            handleNotFound(ctx);
+                        }
+                        else
+                        {
+                            try
+                            {
+                                var row = rows.getJsonObject(0);
+
+                                startDiscoveryPipeline(ctx,
+                                        new JsonArray().add(new JsonObject()
+                                                .put(ID, row.getInteger(ID))
+                                                .put(PORT, row.getInteger(PORT))
+                                                .put(IP, row.getString(IP))
+                                                .put(USERNAME, row.getString(USERNAME))
+                                                .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)))),
+                                        new JsonArray().add(new JsonObject()
+                                                .put(ID, row.getInteger(ID))
+                                                .put("reachable", false)));
+
+                            }
+                            catch (Exception e)
+                            {
+                                LOGGER.error(e.getMessage());
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        LOGGER.error("Failed to process device: " + e.getMessage());
+                    }
+                })
+                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+    }
+
     private void startDiscoveryPipeline(RoutingContext ctx, JsonArray devices, JsonArray defaultResults)
     {
         PingUtil.filterReachableDevicesAsync(ctx.vertx(), devices)
@@ -361,7 +409,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                     if (pingedDevices.isEmpty())
                     {
-                        LOGGER.info("All devices lost after ping. Marking all as inactive.");
+                        LOGGER.info("Device not reachable via ping. Marking as inactive.");
 
                         updateDiscoveryStatus(ctx, defaultResults);
 
@@ -395,28 +443,15 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                         })
                                         .onSuccess(sshResults ->
                                         {
-                                            var sshReachabilityMap = new HashMap<>();
+                                            var deviceResult = defaultResults.getJsonObject(0);
 
-                                            for (var i = 0; i < sshResults.size(); i++)
-                                            {
-                                                var pluginResult = sshResults.getJsonObject(i);
+                                            var id = deviceResult.getInteger(ID);
 
-                                                sshReachabilityMap.put(pluginResult.getInteger(ID), pluginResult.getBoolean("reachable"));
-                                            }
+                                            var reachable = sshResults.getJsonObject(0).getBoolean("reachable");
 
-                                            for (var i = 0; i < defaultResults.size(); i++)
-                                            {
-                                                var deviceResult = defaultResults.getJsonObject(i);
+                                            deviceResult.put("reachable", reachable);
 
-                                                var id = deviceResult.getInteger(ID);
-
-                                                if (sshReachabilityMap.containsKey(id))
-                                                {
-                                                    deviceResult.put("reachable", sshReachabilityMap.get(id));
-                                                }
-                                            }
-
-                                            LOGGER.info("Discovery completed. Updating status for " + defaultResults.size() + " devices.");
+                                            LOGGER.info("Discovery completed. Updating status for device ID: " + id);
 
                                             updateDiscoveryStatus(ctx, defaultResults);
                                         });
@@ -424,95 +459,35 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 });
     }
 
-    public void runDiscovery(RoutingContext ctx)
-    {
-        LOGGER.info("Starting discovery run for all devices");
-
-        executeQuery(DATA_TO_PLUGIN_FOR_DISCOVERY)
-                .onSuccess(dbRes ->
-                {
-                    JsonArray rows = dbRes.getJsonArray("rows", new JsonArray());
-
-                    JsonArray devices = new JsonArray();
-
-                    JsonArray defaultResults = new JsonArray();
-
-                    for (int i = 0; i < rows.size(); i++)
-                    {
-                        try
-                        {
-                            JsonObject row = rows.getJsonObject(i);
-
-                            JsonObject device = new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put(PORT, row.getInteger(PORT))
-                                    .put(IP, row.getString(IP))
-                                    .put(USERNAME, row.getString(USERNAME))
-                                    .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)));
-
-                            devices.add(device);
-
-                            defaultResults.add(new JsonObject()
-                                    .put(ID, row.getInteger(ID))
-                                    .put("reachable", false));
-                        }
-                        catch (Exception e)
-                        {
-                            LOGGER.error("Failed to process device row: " + e.getMessage());
-                        }
-                    }
-
-                    if(handleIfEmpty(ctx,devices)) return;
-
-                    startDiscoveryPipeline(ctx, devices, defaultResults);
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
-    }
-
     private void updateDiscoveryStatus(RoutingContext ctx, JsonArray defaultResults)
     {
-        var batchParams = new ArrayList<List<Object>>();
-
-        for (var i = 0; i < defaultResults.size(); i++)
+        if (defaultResults.isEmpty())
         {
-            var result = defaultResults.getJsonObject(i);
+            LOGGER.warn("No device to update discovery status.");
 
-            var id = result.getInteger(ID);
-
-            var reachable = result.getBoolean("reachable");
-
-            var status = reachable ? ACTIVE : INACTIVE;
-
-            var paramSet = new ArrayList<>();
-
-            paramSet.add(status);
-
-            paramSet.add(id);
-
-            batchParams.add(paramSet);
+            return;
         }
 
-        executeBatch(UPDATE_DISCOVERY_STATUS, batchParams)
+        var result = defaultResults.getJsonObject(0);
+
+        var id = result.getInteger(ID);
+
+        executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean("reachable") ? ACTIVE : INACTIVE, id))
                 .onSuccess(res ->
                 {
-                    LOGGER.info("Batch status update successful for " + defaultResults.size() + " devices.");
-                    // Send response only for runDiscovery (multiple devices)
-                    if (defaultResults.size() > 1)
-                    {
-                        ctx.json(new JsonObject().put("results", defaultResults));
-                    }
+                    LOGGER.info("Discovery status updated for device ID: " + id);
+
+                    ctx.json(new JsonObject().put("results", defaultResults));
                 })
                 .onFailure(err ->
                 {
-                    LOGGER.error("Batch update failed: " + err.getMessage());
-                    // Send error response only for runDiscovery (multiple devices)
-                    if (defaultResults.size() > 1)
-                    {
-                        ctx.response().setStatusCode(500)
-                                .end(new JsonObject().put(ERROR, "Status update failed").encode());
-                    }
+                    LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage());
+
+                    ctx.response().setStatusCode(500)
+                            .end(new JsonObject().put(ERROR, "Status update failed").encode());
                 });
     }
+
 
     public static boolean isNotValidPort(int port)
     {

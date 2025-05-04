@@ -62,9 +62,9 @@ public class MainApp
                 });
             });
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            LOGGER.error(ex.getMessage());
+            LOGGER.error(e.getMessage());
         }
     }
 

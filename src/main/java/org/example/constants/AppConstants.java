@@ -1,6 +1,7 @@
 package org.example.constants;
 
-public class AppConstants {
+public class AppConstants
+{
 
     public static class CredentialQuery
     {
@@ -27,7 +28,7 @@ public class AppConstants {
 
         public static final String UPDATE_DISCOVERY = "UPDATE discovery_profile SET name = $1, ip = $2, port = $3, credential_profile_id = $4 WHERE id = $5";
 
-        public static final String DATA_TO_PLUGIN_FOR_DISCOVERY = "SELECT d.id, d.port, d.ip, c.username, c.password FROM discovery_profile d JOIN credential_profile c ON d.credential_profile_id = c.id";
+        public static final String DATA_TO_PLUGIN_FOR_DISCOVERY = "SELECT d.id, d.port, d.ip, c.username, c.password FROM discovery_profile d JOIN credential_profile c ON d.credential_profile_id = c.id WHERE d.id = $1";
 
         public static final String UPDATE_DISCOVERY_STATUS = "UPDATE discovery_profile SET status = $1 WHERE id = $2";
     }
@@ -161,7 +162,7 @@ public class AppConstants {
 
         public static final String DISCOVERY_BY_ID = "/discovery/:id";
 
-        public static final String DISCOVERY_RUN = "/discovery/run";
+        public static final String DISCOVERY_RUN = "/discovery/:id/run";
 
         public static final String PROVISIONS = "/provision";
 
@@ -209,6 +210,4 @@ public class AppConstants {
     {
         public static final String PROCESS = "process";
     }
-
-
 }

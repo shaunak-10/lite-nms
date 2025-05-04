@@ -26,20 +26,16 @@ public class DatabaseClient
         {
             try
             {
-                var connectOptions = new PgConnectOptions()
-                        .setPort(Integer.parseInt(dotenv.get("DB_PORT")))
-                        .setHost(dotenv.get("DB_HOST"))
-                        .setDatabase(dotenv.get("DB_NAME"))
-                        .setUser(dotenv.get("DB_USER"))
-                        .setPassword(dotenv.get("DB_PASSWORD"))
-                        .setConnectTimeout(5000)
-                        .setIdleTimeout(5 * 60 * 1000);
-
-                var poolOptions = new PoolOptions().setMaxSize(10);
-
                 client = PgBuilder.client()
-                        .with(poolOptions)
-                        .connectingTo(connectOptions)
+                        .with(new PoolOptions().setMaxSize(10))
+                        .connectingTo(new PgConnectOptions()
+                                .setPort(Integer.parseInt(dotenv.get("DB_PORT")))
+                                .setHost(dotenv.get("DB_HOST"))
+                                .setDatabase(dotenv.get("DB_NAME"))
+                                .setUser(dotenv.get("DB_USER"))
+                                .setPassword(dotenv.get("DB_PASSWORD"))
+                                .setConnectTimeout(5000)
+                                .setIdleTimeout(5 * 60 * 1000))
                         .build();
             }
             catch (Exception ex)
@@ -47,6 +43,7 @@ public class DatabaseClient
                 LOGGER.error(ex.getMessage());
             }
         }
+
         return client;
     }
 
@@ -79,8 +76,12 @@ public class DatabaseClient
 
     public static void createTablesIfNotExist(Handler<AsyncResult<Void>> resultHandler)
     {
-        var statements = new String[]{
-                """
+        try
+        {
+            var future = Future.succeededFuture((Void)null);
+
+            for (var query : new String[]{
+                    """
             CREATE TABLE IF NOT EXISTS credential_profile (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) UNIQUE NOT NULL,
@@ -88,7 +89,7 @@ public class DatabaseClient
                 password VARCHAR(100) NOT NULL
             );
             """,
-                """
+                    """
             CREATE TABLE IF NOT EXISTS discovery_profile (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) UNIQUE NOT NULL,
@@ -101,7 +102,7 @@ public class DatabaseClient
                     ON DELETE RESTRICT
             );
             """,
-                """
+                    """
             CREATE TABLE IF NOT EXISTS provisioned_device (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) UNIQUE NOT NULL,
@@ -113,7 +114,7 @@ public class DatabaseClient
                     ON DELETE RESTRICT
             );
             """,
-                """
+                    """
             CREATE TABLE IF NOT EXISTS polling_result (
                 id SERIAL PRIMARY KEY,
                 provisioned_device_id INTEGER NOT NULL,
@@ -124,7 +125,7 @@ public class DatabaseClient
                     ON DELETE CASCADE
             );
             """,
-                """
+                    """
             CREATE TABLE IF NOT EXISTS availability (
                  id SERIAL PRIMARY KEY,
                  provisioned_device_id INTEGER NOT NULL,
@@ -135,32 +136,17 @@ public class DatabaseClient
                      ON DELETE CASCADE
              );
             """
-        };
+            })
+            {
+                future = future.compose(v -> getClient().query(query).execute().mapEmpty());
+            }
 
-        executeSequentially(getClient(), statements, 0, resultHandler);
-    }
-
-    private static void executeSequentially(SqlClient client, String[] queries, int index, Handler<AsyncResult<Void>> resultHandler)
-    {
-        if (index >= queries.length)
+            future.onComplete(resultHandler);
+        }
+        catch (Exception e)
         {
-            resultHandler.handle(Future.succeededFuture());
-
-            return;
+            LOGGER.error(e.getMessage());
         }
 
-        client.query(queries[index]).execute(ar ->
-        {
-            if (ar.succeeded())
-            {
-                executeSequentially(client, queries, index + 1, resultHandler);
-            }
-            else
-            {
-                LOGGER.error("Failed to execute query: " + ar.cause().getMessage());
-
-                resultHandler.handle(Future.failedFuture(ar.cause()));
-            }
-        });
     }
 }
