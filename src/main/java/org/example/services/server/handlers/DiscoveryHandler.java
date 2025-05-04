@@ -5,12 +5,12 @@ import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import org.example.services.plugin.PluginService;
-import org.example.services.plugin.PluginVerticle;
+import org.example.services.discovery.DiscoveryVerticle;
 import org.example.utils.*;
 
 import java.util.*;
 
+import static org.example.constants.AppConstants.CredentialField.NAME;
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
@@ -34,35 +34,19 @@ public class DiscoveryHandler extends AbstractCrudHandler
     @Override
     public void add(RoutingContext ctx)
     {
-        var body = ctx.body().asJsonObject();
-
-        if (body == null)
-        {
-            handleMissingData(ctx, INVALID_JSON_BODY);
-
-            return;
-        }
-
         try
         {
-            var name = body.getString(NAME);
+            var body = ctx.body().asJsonObject();
 
-            var ip = body.getString(IP);
+            if(notValidateDiscoveryFields(ctx, body)) return;
 
             var port = body.getInteger(PORT, 22);
 
             var credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
 
-            if (name == null || ip == null || credentialProfileId == 0)
-            {
-                handleMissingData(ctx, MISSING_FIELDS);
-
-                return;
-            }
-
             LOGGER.info("Adding new discovery profile: " + body.encode());
 
-            IpResolutionUtil.resolveAndValidateIp(ctx.vertx(), ip)
+            IpResolutionUtil.resolveAndValidateIp(ctx.vertx(), body.getString(IP))
                     .onSuccess(validIp ->
                     {
                         if (validIp == null)
@@ -79,7 +63,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                             return;
                         }
 
-                        executeQuery(ADD_DISCOVERY, List.of(name, validIp, port, INACTIVE, credentialProfileId))
+                        executeQuery(ADD_DISCOVERY, List.of(body.getString(NAME), validIp, port, INACTIVE, credentialProfileId))
                                 .onSuccess(result ->
                                 {
                                     var rows = result.getJsonArray("rows");
@@ -90,15 +74,33 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                                         LOGGER.info("Discovery profile added with ID: " + id);
 
-                                        // Fetch device details and trigger discovery
-                                        fetchDeviceDetailsAndRunDiscovery(ctx, id, validIp, port, credentialProfileId);
+                                        var discoveryRequest = new JsonObject()
+                                                .put("action", "fetchDeviceDetailsAndRunDiscovery")
+                                                .put("discoveryId", id)
+                                                .put("ip", validIp)
+                                                .put("port", port)
+                                                .put("credentialProfileId", credentialProfileId);
 
-                                        // Respond to the client immediately
+                                        ctx.vertx().eventBus().request(DiscoveryVerticle.SERVICE_ADDRESS, discoveryRequest,
+                                                ar ->
+                                                {
+                                                    if (ar.failed())
+                                                    {
+                                                        LOGGER.error("Error during discovery process: " + ar.cause().getMessage());
+                                                    }
+                                                    else
+                                                    {
+                                                        LOGGER.info("Discovery process initiated successfully for ID: " + id);
+                                                    }
+                                                });
+
                                         handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
                                     }
                                     else
                                     {
-                                        handleSuccess(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS));
+                                        LOGGER.error("Insert succeeded but no ID returned.");
+
+                                        handleMissingData(ctx,"Insert succeeded but no ID returned.");
                                     }
                                 })
                                 .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
@@ -186,23 +188,18 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
     public void update(RoutingContext ctx)
     {
-        var id = validateIdFromPath(ctx);
-
-        if (id == -1) return;
-
-        var body = ctx.body().asJsonObject();
-
-        if (body == null || body.isEmpty())
-        {
-            handleMissingData(ctx, NO_DATA_TO_UPDATE);
-
-            return;
-        }
-
-        LOGGER.info("Updating discovery profile ID " + id + " with data: " + body.encode());
-
         try
         {
+            var id = validateIdFromPath(ctx);
+
+            if (id == -1) return;
+
+            var body = ctx.body().asJsonObject();
+
+            if(notValidateDiscoveryFields(ctx, body)) return;
+
+            LOGGER.info("Updating discovery profile ID " + id + " with data: " + body.encode());
+
             var name = body.getString(NAME);
 
             var ip = body.getString(IP);
@@ -321,17 +318,34 @@ public class DiscoveryHandler extends AbstractCrudHandler
                             {
                                 var row = rows.getJsonObject(0);
 
-                                startDiscoveryPipeline(ctx,
-                                        new JsonArray().add(new JsonObject()
+                                // Send data to DiscoveryVerticle to process
+                                var discoveryData = new JsonObject()
+                                        .put("action", "startDiscovery")
+                                        .put("device", new JsonObject()
                                                 .put(ID, row.getInteger(ID))
                                                 .put(PORT, row.getInteger(PORT))
                                                 .put(IP, row.getString(IP))
                                                 .put(USERNAME, row.getString(USERNAME))
-                                                .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)))),
-                                        new JsonArray().add(new JsonObject()
-                                                .put(ID, row.getInteger(ID))
-                                                .put("reachable", false)));
+                                                .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD))));
 
+                                ctx.vertx().eventBus().request(DiscoveryVerticle.SERVICE_ADDRESS, discoveryData,
+                                        ar ->
+                                        {
+                                            if (ar.failed())
+                                            {
+                                                LOGGER.error("Error during discovery process: " + ar.cause().getMessage());
+
+                                                ctx.response()
+                                                        .setStatusCode(500)
+                                                        .end(new JsonObject().put(ERROR, PLUGIN_EXECUTION_FAILED).encode());
+                                            }
+                                            else
+                                            {
+                                                JsonObject response = (JsonObject) ar.result().body();
+
+                                                ctx.json(response);
+                                            }
+                                        });
                             }
                             catch (Exception e)
                             {
@@ -347,156 +361,34 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
     }
 
-    private void startDiscoveryPipeline(RoutingContext ctx, JsonArray devices, JsonArray defaultResults)
-    {
-        PingUtil.filterReachableDevicesAsync(ctx.vertx(), devices)
-                .onFailure(cause -> ctx.fail(500, cause))
-                .onSuccess(pingedDevices ->
-                {
-
-                    if (pingedDevices.isEmpty())
-                    {
-                        LOGGER.info("Device not reachable via ping. Marking as inactive.");
-
-                        updateDiscoveryStatus(ctx, defaultResults);
-
-                        return;
-                    }
-
-                    PortUtil.filterReachableDevicesAsync(ctx.vertx(), pingedDevices)
-                            .onFailure(cause -> ctx.fail(500, cause))
-                            .onSuccess(portFilteredDevices ->
-                            {
-
-                                if (portFilteredDevices.isEmpty())
-                                {
-                                    LOGGER.info("All devices lost after port check. Marking all as inactive.");
-
-                                    updateDiscoveryStatus(ctx, defaultResults);
-
-                                    return;
-                                }
-
-                                var pluginService = PluginService.createProxy(ctx.vertx(), PluginVerticle.SERVICE_ADDRESS);
-
-                                pluginService.runSSHReachability(portFilteredDevices)
-                                        .onFailure(err ->
-                                        {
-                                            LOGGER.error("SSH plugin call failed: " + err.getMessage());
-
-                                            ctx.response()
-                                                    .setStatusCode(500)
-                                                    .end(new JsonObject().put(ERROR, PLUGIN_EXECUTION_FAILED).encode());
-                                        })
-                                        .onSuccess(sshResults ->
-                                        {
-                                            var deviceResult = defaultResults.getJsonObject(0);
-
-                                            deviceResult.put("reachable", sshResults.getJsonObject(0).getBoolean("reachable"));
-
-                                            LOGGER.info("Discovery completed. Updating status for device ID: " + deviceResult.getInteger(ID));
-
-                                            updateDiscoveryStatus(ctx, defaultResults);
-                                        });
-                            });
-                });
-    }
-
-    private void updateDiscoveryStatus(RoutingContext ctx, JsonArray defaultResults)
-    {
-        if (defaultResults.isEmpty())
-        {
-            LOGGER.warn("No device to update discovery status.");
-
-            return;
-        }
-
-        var result = defaultResults.getJsonObject(0);
-
-        var id = result.getInteger(ID);
-
-        executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean("reachable") ? ACTIVE : INACTIVE, id))
-                .onSuccess(res ->
-                {
-                    LOGGER.info("Discovery status updated for device ID: " + id);
-
-                    ctx.json(new JsonObject().put("results", defaultResults));
-                })
-                .onFailure(err ->
-                {
-                    LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage());
-
-                    ctx.response().setStatusCode(500)
-                            .end(new JsonObject().put(ERROR, "Status update failed").encode());
-                });
-    }
-
-    private void fetchDeviceDetailsAndRunDiscovery(RoutingContext ctx, int id, String ip, int port, int credentialProfileId)
-    {
-        // Query to fetch username and password based on credentialProfileId
-        var query = "SELECT username, password FROM credential_profile WHERE id = $1";
-
-        executeQuery(query, List.of(credentialProfileId))
-                .onSuccess(result ->
-                {
-                    var rows = result.getJsonArray("rows", new JsonArray());
-
-                    if (rows.isEmpty())
-                    {
-                        LOGGER.warn("No credentials found for credentialProfileId: " + credentialProfileId);
-
-                        return;
-                    }
-
-                    var row = rows.getJsonObject(0);
-
-                    var password = "";
-
-                    try
-                    {
-                        password = DecryptionUtil.decrypt(row.getString(PASSWORD));
-                    }
-                    catch (Exception e)
-                    {
-                        LOGGER.error("Failed to decrypt password: " + e.getMessage());
-
-                        return;
-                    }
-
-                    // Construct device JSON object
-                    var device = new JsonObject()
-                            .put(ID, id)
-                            .put(IP, ip)
-                            .put(PORT, port)
-                            .put(USERNAME, row.getString(USERNAME))
-                            .put(PASSWORD, password);
-
-                    var devices = new JsonArray().add(device);
-
-                    var defaultResults = new JsonArray().add(new JsonObject()
-                            .put(ID, id)
-                            .put("reachable", false));
-
-                    // Run discovery for the single device
-                    startDiscoveryPipeline(ctx, devices, defaultResults);
-                })
-                .onFailure(cause ->
-                        LOGGER.error("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage()));
-    }
-
     public static boolean isNotValidPort(int port)
     {
         return !(port >= 1) || !(port <= 65535);
     }
 
-    private boolean handleIfEmpty(RoutingContext ctx, JsonArray devices)
+    private boolean notValidateDiscoveryFields(RoutingContext ctx, JsonObject body)
     {
-        if (devices.isEmpty())
+        if (body == null)
         {
-            ctx.json(new JsonObject().put(MESSAGE, NO_DEVICES_FOR_DISCOVERY));
+            handleMissingData(ctx, INVALID_JSON_BODY);
 
             return true;
         }
+
+        var name = body.getString(NAME);
+
+        var ip = body.getString(IP);
+
+        var credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
+
+        if (name == null || ip == null || credentialProfileId == 0)
+        {
+            handleMissingData(ctx, MISSING_FIELDS);
+
+            return true;
+        }
+
         return false;
     }
+
 }

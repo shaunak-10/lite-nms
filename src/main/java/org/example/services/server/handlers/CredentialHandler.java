@@ -66,7 +66,9 @@ public class CredentialHandler extends AbstractCrudHandler
                     }
                     else
                     {
-                        handleSuccess(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS));
+                        LOGGER.error("Insert succeeded but no ID returned.");
+
+                        handleMissingData(ctx,"Insert succeeded but no ID returned.");
                     }
                 })
                 .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));

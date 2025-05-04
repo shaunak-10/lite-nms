@@ -6,6 +6,7 @@ import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;
 import org.example.services.db.DatabaseClient;
 import org.example.services.db.DatabaseVerticle;
+import org.example.services.discovery.DiscoveryVerticle;
 import org.example.services.plugin.PluginVerticle;
 import org.example.services.scheduler.SchedulerVerticle;
 import org.example.services.server.HttpServerVerticle;
@@ -74,6 +75,7 @@ public class MainApp
                 DatabaseVerticle.class,
                 PluginVerticle.class,
                 SchedulerVerticle.class,
+                DiscoveryVerticle.class,
                 HttpServerVerticle.class
         );
 

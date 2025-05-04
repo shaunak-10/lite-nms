@@ -31,6 +31,8 @@ public class AppConstants
         public static final String DATA_TO_PLUGIN_FOR_DISCOVERY = "SELECT d.id, d.port, d.ip, c.username, c.password FROM discovery_profile d JOIN credential_profile c ON d.credential_profile_id = c.id WHERE d.id = $1";
 
         public static final String UPDATE_DISCOVERY_STATUS = "UPDATE discovery_profile SET status = $1 WHERE id = $2";
+
+        public static final String FETCH_CREDENTIAL_FROM_ID = "SELECT username, password FROM credential_profile WHERE id = $1";
     }
 
 
