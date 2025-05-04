@@ -7,7 +7,6 @@ import io.vertx.core.impl.logging.LoggerFactory;
 import org.example.services.db.DatabaseClient;
 import org.example.services.db.DatabaseVerticle;
 import org.example.services.discovery.DiscoveryVerticle;
-import org.example.services.plugin.PluginVerticle;
 import org.example.services.scheduler.SchedulerVerticle;
 import org.example.services.server.HttpServerVerticle;
 import org.example.utils.ConfigLoader;
@@ -73,7 +72,6 @@ public class MainApp
     {
         var verticles = List.of(
                 DatabaseVerticle.class,
-                PluginVerticle.class,
                 SchedulerVerticle.class,
                 DiscoveryVerticle.class,
                 HttpServerVerticle.class

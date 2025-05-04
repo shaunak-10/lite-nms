@@ -10,8 +10,7 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.example.services.db.DatabaseService;
 import org.example.services.db.DatabaseVerticle;
-import org.example.services.plugin.PluginService;
-import org.example.services.plugin.PluginVerticle;
+import org.example.utils.PluginOperationsUtil;
 import org.example.utils.DecryptionUtil;
 import org.example.utils.PingUtil;
 import org.example.utils.PortUtil;
@@ -114,9 +113,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                                     return;
                                 }
 
-                                var pluginService = PluginService.createProxy(vertx, PluginVerticle.SERVICE_ADDRESS);
-
-                                pluginService.runSSHReachability(portFilteredDevices)
+                                PluginOperationsUtil.runSSHReachability(portFilteredDevices)
                                         .onFailure(err ->
                                         {
                                             LOGGER.error("SSH plugin call failed: " + err.getMessage());

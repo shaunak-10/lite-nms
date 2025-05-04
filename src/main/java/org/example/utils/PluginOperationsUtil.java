@@ -1,7 +1,6 @@
-package org.example.services.plugin;
+package org.example.utils;
 
 import io.vertx.core.Future;
-import io.vertx.core.Vertx;
 import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
@@ -14,38 +13,26 @@ import static org.example.constants.AppConstants.PingConstants.TIMEOUT;
 
 import io.vertx.core.json.JsonObject;
 import org.example.MainApp;
-import org.example.utils.ConfigLoader;
-import org.example.utils.DecryptionUtil;
-import org.example.utils.EncryptionUtil;
 
-public class PluginServiceImpl implements PluginService
+public class PluginOperationsUtil
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(PluginServiceImpl.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(PluginOperationsUtil.class);
 
-    private final Vertx vertx;
-
-    public PluginServiceImpl()
-    {
-        this.vertx = MainApp.vertx;
-    }
-
-    @Override
-    public Future<JsonArray> runSSHReachability(JsonArray devices)
+    public static Future<JsonArray> runSSHReachability(JsonArray devices)
     {
         return executePlugin(devices, "reachability");
     }
 
-    @Override
-    public Future<JsonArray> runSSHMetrics(JsonArray devices)
+    public static Future<JsonArray> runSSHMetrics(JsonArray devices)
     {
         return executePlugin(devices, "metrics");
     }
 
-    private Future<JsonArray> executePlugin(JsonArray devices, String command)
+    private static Future<JsonArray> executePlugin(JsonArray devices, String command)
     {
         var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
 
-        return vertx.executeBlocking(() ->
+        return MainApp.vertx.executeBlocking(() ->
         {
             Process process = null;
 

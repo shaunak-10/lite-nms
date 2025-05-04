@@ -8,8 +8,7 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.example.services.db.DatabaseService;
 import org.example.services.db.DatabaseVerticle;
-import org.example.services.plugin.PluginService;
-import org.example.services.plugin.PluginVerticle;
+import org.example.utils.PluginOperationsUtil;
 import org.example.utils.DecryptionUtil;
 import org.example.utils.PingUtil;
 
@@ -28,8 +27,6 @@ public class SchedulerServiceImpl implements SchedulerService
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SchedulerServiceImpl.class);
 
-    private final PluginService pluginService;
-
     private final DatabaseService databaseService;
 
     private long pollingTimerId = -1;
@@ -38,8 +35,6 @@ public class SchedulerServiceImpl implements SchedulerService
 
     public SchedulerServiceImpl(Vertx vertx)
     {
-        this.pluginService = PluginService.createProxy(vertx, PluginVerticle.SERVICE_ADDRESS);
-
         this.databaseService = DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS);
 
         this.vertx = vertx;
@@ -135,7 +130,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                         return;
                                     }
 
-                                    pluginService.runSSHMetrics(pingedDevices)
+                                    PluginOperationsUtil.runSSHMetrics(pingedDevices)
                                             .onSuccess(metricsResults ->
                                             {
                                                 LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
