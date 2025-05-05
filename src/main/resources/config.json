@@ -10,5 +10,6 @@
   "process": {
     "timeout": 4
   },
-  "polling-interval": 10000
+  "polling-interval": 10000,
+  "ip.resolution.timeout": 2000
 }

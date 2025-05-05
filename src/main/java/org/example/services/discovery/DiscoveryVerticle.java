@@ -47,176 +47,185 @@ public class DiscoveryVerticle extends AbstractVerticle
 
     private void handleDiscoveryRequests(Message<JsonObject> message)
     {
-        var request = message.body();
-
-        var action = request.getString("action");
-
-        switch (action)
+        try
         {
-            case "startDiscovery":
+            var request = message.body();
 
-                var device = request.getJsonObject("device");
+            var action = request.getString("action");
 
-                if (device == null)
-                {
-                    message.fail(400, "Missing device data");
+            switch (action)
+            {
+                case "startDiscovery":
 
-                    return;
-                }
+                    var device = request.getJsonObject("device");
 
-                startDiscoveryPipeline(new JsonArray().add(device), new JsonArray().add(new JsonObject()
-                        .put(ID, device.getInteger(ID))
-                        .put("reachable", false)), message);
+                    if (device == null)
+                    {
+                        LOGGER.error("Device information is missing in the request.");
 
-                break;
+                        return;
+                    }
 
-            case "fetchDeviceDetailsAndRunDiscovery":
+                    startDiscoveryPipeline(new JsonArray().add(device), new JsonArray().add(new JsonObject()
+                            .put(ID, device.getInteger(ID))
+                            .put("reachable", false)), message);
 
-                fetchDeviceDetailsAndRunDiscovery(request.getInteger("discoveryId"),
-                        request.getString("ip"),
-                        request.getInteger("port"),
-                        request.getInteger("credentialProfileId"),
-                        message);
+                    break;
 
-                break;
+                case "fetchDeviceDetailsAndRunDiscovery":
 
-            default:
-                message.fail(400, "Unknown action: " + action);
+                    fetchDeviceDetailsAndRunDiscovery(request.getInteger("discoveryId"),
+                            request.getString("ip"),
+                            request.getInteger("port"),
+                            request.getInteger("credentialProfileId"),
+                            message);
+
+                    break;
+
+                default:
+                    LOGGER.warn("Unknown action: " + action);
+            }
         }
+        catch (Exception e)
+        {
+            LOGGER.error("Failed to handle discovery requests: " + e.getMessage());
+        }
+        
     }
 
     private void startDiscoveryPipeline(JsonArray devices, JsonArray defaultResults, Message<JsonObject> message)
     {
-        PingUtil.filterReachableDevicesAsync(vertx, devices)
-                .onFailure(cause -> message.fail(500, "Ping check failed: " + cause.getMessage()))
-                .onSuccess(pingedDevices ->
-                {
-                    if (pingedDevices.isEmpty())
+        try
+        {
+            PingUtil.filterReachableDevices(vertx, devices)
+                    .onFailure(cause -> LOGGER.error("Ping check failed: " + cause.getMessage()))
+                    .onSuccess(pingedDevices ->
                     {
-                        LOGGER.info("Device not reachable via ping. Marking as inactive.");
+                        if (pingedDevices.isEmpty())
+                        {
+                            LOGGER.info("Device not reachable via ping. Marking as inactive.");
 
-                        updateDiscoveryStatus(defaultResults, message);
+                            updateDiscoveryStatus(defaultResults, message);
 
-                        return;
-                    }
+                            return;
+                        }
 
-                    PortUtil.filterReachableDevicesAsync(vertx, pingedDevices)
-                            .onFailure(cause -> message.fail(500, "Port check failed: " + cause.getMessage()))
-                            .onSuccess(portFilteredDevices ->
-                            {
-                                if (portFilteredDevices.isEmpty())
+                        PortUtil.filterReachableDevices(vertx, pingedDevices)
+                                .onFailure(cause -> LOGGER.error("Port check failed: " + cause.getMessage()))
+                                .onSuccess(portFilteredDevices ->
                                 {
-                                    LOGGER.info("All devices lost after port check. Marking all as inactive.");
+                                    if (portFilteredDevices.isEmpty())
+                                    {
+                                        LOGGER.info("All devices lost after port check. Marking all as inactive.");
 
-                                    updateDiscoveryStatus(defaultResults, message);
+                                        updateDiscoveryStatus(defaultResults, message);
 
-                                    return;
-                                }
+                                        return;
+                                    }
 
-                                PluginOperationsUtil.runSSHReachability(portFilteredDevices)
-                                        .onFailure(err ->
-                                        {
-                                            LOGGER.error("SSH plugin call failed: " + err.getMessage());
+                                    PluginOperationsUtil.runSSHReachability(portFilteredDevices)
+                                            .onFailure(err ->
+                                                    LOGGER.error("SSH plugin call failed: " + err.getMessage()))
+                                            .onSuccess(sshResults ->
+                                            {
+                                                var deviceResult = defaultResults.getJsonObject(0);
 
-                                            message.fail(500, "SSH plugin call failed: " + err.getMessage());
-                                        })
-                                        .onSuccess(sshResults ->
-                                        {
-                                            var deviceResult = defaultResults.getJsonObject(0);
+                                                deviceResult.put("reachable", sshResults.getJsonObject(0).getBoolean("reachable"));
 
-                                            deviceResult.put("reachable", sshResults.getJsonObject(0).getBoolean("reachable"));
+                                                LOGGER.info("Discovery completed. Updating status for device ID: " + deviceResult.getInteger(ID));
 
-                                            LOGGER.info("Discovery completed. Updating status for device ID: " + deviceResult.getInteger(ID));
-
-                                            updateDiscoveryStatus(defaultResults, message);
-                                        });
-                            });
-                });
+                                                updateDiscoveryStatus(defaultResults, message);
+                                            });
+                                });
+                    });
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Failed to start run discovery: " + e.getMessage());
+        }
     }
 
     private void updateDiscoveryStatus(JsonArray defaultResults, Message<JsonObject> message)
     {
-        if (defaultResults.isEmpty())
+        try
         {
-            LOGGER.warn("No device to update discovery status.");
+            if (defaultResults.isEmpty())
+            {
+                LOGGER.warn("No device to update discovery status.");
 
-            message.fail(400, "No device to update discovery status");
+                return;
+            }
 
-            return;
+            var result = defaultResults.getJsonObject(0);
+
+            var id = result.getInteger(ID);
+
+            executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean("reachable") ? ACTIVE : INACTIVE, id))
+                    .onSuccess(res ->
+                    {
+                        LOGGER.info("Discovery status updated for device ID: " + id);
+                    })
+                    .onFailure(err ->
+                    {
+                        LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage());
+                    });
+        }
+        catch (Exception e)
+        {
+            LOGGER.error(e.getMessage());
         }
 
-        var result = defaultResults.getJsonObject(0);
-
-        var id = result.getInteger(ID);
-
-        executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean("reachable") ? ACTIVE : INACTIVE, id))
-                .onSuccess(res ->
-                {
-                    LOGGER.info("Discovery status updated for device ID: " + id);
-
-                    message.reply(new JsonObject().put("results", defaultResults));
-                })
-                .onFailure(err ->
-                {
-                    LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage());
-
-                    message.fail(500, "Status update failed: " + err.getMessage());
-                });
     }
 
     private void fetchDeviceDetailsAndRunDiscovery(int id, String ip, int port, int credentialProfileId, Message<JsonObject> message)
     {
-        executeQuery(FETCH_CREDENTIAL_FROM_ID, List.of(credentialProfileId))
-                .onSuccess(result ->
-                {
-                    var rows = result.getJsonArray("rows", new JsonArray());
-
-                    if (rows.isEmpty())
+        try
+        {
+            executeQuery(FETCH_CREDENTIAL_FROM_ID, List.of(credentialProfileId))
+                    .onSuccess(result ->
                     {
-                        LOGGER.warn("No credentials found for credentialProfileId: " + credentialProfileId);
+                        try
+                        {
+                            var rows = result.getJsonArray("rows", new JsonArray());
 
-                        message.fail(404, "No credentials found for the given profile ID");
+                            if (rows.isEmpty())
+                            {
+                                LOGGER.warn("No credentials found for credentialProfileId: " + credentialProfileId);
 
-                        return;
-                    }
+                                return;
+                            }
 
-                    var row = rows.getJsonObject(0);
+                            var row = rows.getJsonObject(0);
 
-                    var password = "";
+                            var password = DecryptionUtil.decrypt(row.getString(PASSWORD));
 
-                    try
-                    {
-                        password = DecryptionUtil.decrypt(row.getString(PASSWORD));
-                    }
-                    catch (Exception e)
-                    {
-                        LOGGER.error("Failed to decrypt password: " + e.getMessage());
+                            // Construct device JSON object
+                            var device = new JsonObject()
+                                    .put(ID, id)
+                                    .put(IP, ip)
+                                    .put(PORT, port)
+                                    .put(USERNAME, row.getString(USERNAME))
+                                    .put(PASSWORD, password);
 
-                        message.fail(500, "Failed to decrypt password: " + e.getMessage());
+                            // Run discovery for the single device
+                            startDiscoveryPipeline(new JsonArray().add(device),
+                                    new JsonArray().add(new JsonObject()
+                                            .put(ID, id)
+                                            .put("reachable", false)), message);
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing result: " + e.getMessage());
+                        }
+                    })
+                    .onFailure(cause ->
+                            LOGGER.error("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage()));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Failed to fetch device details and run discovery: " + e.getMessage());
+        }
 
-                        return;
-                    }
-
-                    // Construct device JSON object
-                    var device = new JsonObject()
-                            .put(ID, id)
-                            .put(IP, ip)
-                            .put(PORT, port)
-                            .put(USERNAME, row.getString(USERNAME))
-                            .put(PASSWORD, password);
-
-                    // Run discovery for the single device
-                    startDiscoveryPipeline(new JsonArray().add(device),
-                            new JsonArray().add(new JsonObject()
-                            .put(ID, id)
-                            .put("reachable", false)), message);
-                })
-                .onFailure(cause ->
-                {
-                    LOGGER.error("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage());
-
-                    message.fail(500, "Failed to fetch credentials: " + cause.getMessage());
-                });
     }
 
     Future<JsonObject> executeQuery(String query, List<Object> params)

@@ -22,10 +22,8 @@ public class DecryptionUtil
 
     public static String decrypt(String encryptedText) throws Exception
     {
-        var data = Base64.getDecoder().decode(encryptedText);
-
         // Extract IV and ciphertext
-        var byteBuffer = ByteBuffer.wrap(data);
+        var byteBuffer = ByteBuffer.wrap(Base64.getDecoder().decode(encryptedText));
 
         var iv = new byte[16];
 

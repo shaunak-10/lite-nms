@@ -11,11 +11,11 @@ import static org.example.constants.AppConstants.PingConstants.*;
 
 public class PingUtil
 {
-    public static Future<JsonArray> filterReachableDevicesAsync(Vertx vertx, JsonArray devices)
+    public static Future<JsonArray> filterReachableDevices(Vertx vertx, JsonArray devices)
     {
         var pingConfig = ConfigLoader.get().getJsonObject(PING_COMMAND);
 
-        return ConnectivityUtil.filterReachableDevicesAsync(vertx, devices, device ->
+        return ConnectivityUtil.filterReachableDevices(vertx, devices, device ->
                 Arrays.asList(PING_COMMAND,
                         PACKETS_OPTION, String.valueOf(pingConfig.getInteger(COUNT)),
                         TIMEOUT_OPTION, String.valueOf(pingConfig.getInteger(TIMEOUT)),

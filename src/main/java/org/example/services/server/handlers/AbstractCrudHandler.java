@@ -6,13 +6,13 @@ import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.example.MainApp;
 import org.example.services.db.DatabaseService;
 import org.example.services.db.DatabaseVerticle;
 
 import java.util.Collections;
 import java.util.List;
 
-import static org.example.MainApp.vertx;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
 import static org.example.constants.AppConstants.Headers.*;
@@ -21,7 +21,7 @@ public abstract class AbstractCrudHandler
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractCrudHandler.class);
 
-    DatabaseService databaseService = DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS);
+    DatabaseService databaseService = DatabaseService.createProxy(MainApp.getVertx(), DatabaseVerticle.SERVICE_ADDRESS);
 
     public abstract void add(RoutingContext ctx);
 
@@ -40,10 +40,7 @@ public abstract class AbstractCrudHandler
 
         if (idParam == null)
         {
-            ctx.response()
-                    .setStatusCode(400)
-                    .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                    .end(new JsonObject().put(ERROR, INVALID_ID_IN_PATH).encodePrettily());
+            sendJsonResponse(ctx, 400, new JsonObject().put(ERROR, INVALID_ID_IN_PATH));
 
             return -1;
         }
@@ -54,10 +51,7 @@ public abstract class AbstractCrudHandler
         }
         catch (Exception e)
         {
-            ctx.response()
-                    .setStatusCode(400)
-                    .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                    .end(new JsonObject().put(ERROR, INVALID_ID_IN_PATH).encode());
+            sendJsonResponse(ctx, 400, new JsonObject().put(ERROR, INVALID_ID_IN_PATH));
 
             return -1;
         }
@@ -67,69 +61,61 @@ public abstract class AbstractCrudHandler
     {
         LOGGER.error(message + ": " + cause.getMessage());
 
-        ctx.response()
-                .setStatusCode(500)
-                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .end(new JsonObject()
-                        .put(ERROR, message)
-                        .put(DETAILS, cause.getMessage())
-                        .encodePrettily());
+        sendJsonResponse(ctx, 500, new JsonObject()
+                .put(ERROR, message)
+                .put(DETAILS, cause.getMessage()));
     }
 
-    protected void handleNotFound(RoutingContext ctx)
+    protected void handleNotFound(RoutingContext ctx, JsonObject response)
     {
-        LOGGER.warn(org.example.constants.AppConstants.Message.NOT_FOUND);
+        LOGGER.warn(NOT_FOUND);
 
-        ctx.response()
-                .setStatusCode(404)
-                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .end(new JsonObject().put(ERROR, org.example.constants.AppConstants.Message.NOT_FOUND).encodePrettily());
+        sendJsonResponse(ctx, 404, response);
     }
 
     protected void handleMissingData(RoutingContext ctx, String message)
     {
         LOGGER.warn(message);
 
-        ctx.response()
-                .setStatusCode(400)
-                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .end(new JsonObject().put(ERROR, message).encodePrettily());
+        sendJsonResponse(ctx, 400, new JsonObject().put(ERROR, message));
     }
 
-    protected void handleSuccess(RoutingContext ctx, JsonObject response)
-    {
-        ctx.response()
-                .setStatusCode(200)
-                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .end(response.encodePrettily());
+    protected void handleSuccess(RoutingContext ctx, JsonObject response) {
+        sendJsonResponse(ctx, 200, response);
     }
 
     protected void handleCreated(RoutingContext ctx, JsonObject response)
     {
-        ctx.response()
-                .setStatusCode(201)
-                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .end(response.encodePrettily());
+        sendJsonResponse(ctx, 201, response);
     }
 
     protected void handleInvalidData(RoutingContext ctx, String message)
     {
         LOGGER.warn(message);
 
-        ctx.response()
-                .setStatusCode(400)
-                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .end(new JsonObject().put(ERROR, message).encodePrettily());
+        sendJsonResponse(ctx, 400, new JsonObject().put(ERROR, message));
     }
 
     protected void handleInvalidOperation(RoutingContext ctx, String message)
     {
         LOGGER.warn(message);
 
-        ctx.response()
-                .setStatusCode(405)
-                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                .end(new JsonObject().put(ERROR, message).encodePrettily());
+        sendJsonResponse(ctx, 405, new JsonObject().put(ERROR, message));
+    }
+
+    protected void sendJsonResponse(RoutingContext ctx, int statusCode, JsonObject body)
+    {
+        try
+        {
+            ctx.response()
+                    .setStatusCode(statusCode)
+                    .putHeader(CONTENT_TYPE, APPLICATION_JSON)
+                    .end(body.encodePrettily());
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Failed to send JSON response: " + e.getMessage());
+        }
     }
 
     Future<JsonObject> executeQuery(String query, List<Object> params)
@@ -148,24 +134,5 @@ public abstract class AbstractCrudHandler
     Future<JsonObject> executeQuery(String query)
     {
         return executeQuery(query, Collections.emptyList());
-    }
-
-    public Future<JsonObject> executeBatch(String query, List<List<Object>> paramsList)
-    {
-        var request = new JsonObject()
-                .put("query", query);
-
-        var paramsArray = new JsonArray();
-
-        for (var params : paramsList)
-        {
-            var paramArray = new JsonArray(params);
-
-            paramsArray.add(paramArray);
-        }
-
-        request.put("params", paramsArray);
-
-        return databaseService.executeBatch(request);
     }
 }

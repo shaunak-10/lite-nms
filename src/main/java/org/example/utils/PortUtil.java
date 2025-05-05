@@ -10,11 +10,11 @@ import static org.example.constants.AppConstants.DiscoveryField.IP;
 import static org.example.constants.AppConstants.PortConstants.*;
 
 public class PortUtil {
-    public static Future<JsonArray> filterReachableDevicesAsync(Vertx vertx, JsonArray devices)
+    public static Future<JsonArray> filterReachableDevices(Vertx vertx, JsonArray devices)
     {
         var portConfig = ConfigLoader.get().getJsonObject(PORT);
 
-        return ConnectivityUtil.filterReachableDevicesAsync(vertx, devices, device ->
+        return ConnectivityUtil.filterReachableDevices(vertx, devices, device ->
                 Arrays.asList(NC_COMMAND, ZERO_IO, TIMEOUT_OPTION, String.valueOf(portConfig.getInteger(TIMEOUT)),
                         device.getString(IP),
                         String.valueOf(device.getInteger(PORT, 22)))

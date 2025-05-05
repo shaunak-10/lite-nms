@@ -173,7 +173,7 @@ public class AppConstants
 
     public static class AddressesAndPaths
     {
-        public static final String PLUGIN_PATH = "/home/shaunak/IdeaProjects/http-server/src/main/java/org/example/plugin_executable/ssh-plugin-with-encryption";
+        public static final String PLUGIN_PATH = "/home/shaunak/IdeaProjects/http-server/src/main/java/org/example/plugin_executable/ssh-plugin";
 
         public static final String CONFIG_FILE_PATH = "src/main/resources/config.json";
     }

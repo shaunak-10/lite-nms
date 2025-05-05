@@ -15,7 +15,7 @@ import static org.example.constants.AppConstants.PingConstants.TIMEOUT;
 
 public class ConnectivityUtil
 {
-    public static Future<JsonArray> filterReachableDevicesAsync(Vertx vertx, JsonArray devices, Function<JsonObject, List<String>> commandProvider)
+    public static Future<JsonArray> filterReachableDevices(Vertx vertx, JsonArray devices, Function<JsonObject, List<String>> commandProvider)
     {
         var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
 

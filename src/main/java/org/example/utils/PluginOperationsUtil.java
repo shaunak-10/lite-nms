@@ -32,7 +32,7 @@ public class PluginOperationsUtil
     {
         var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
 
-        return MainApp.vertx.executeBlocking(() ->
+        return MainApp.getVertx().executeBlocking(() ->
         {
             Process process = null;
 

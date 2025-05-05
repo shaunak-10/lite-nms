@@ -43,137 +43,146 @@ public class SchedulerServiceImpl implements SchedulerService
     @Override
     public Future<String> startPolling(int interval)
     {
-        if (pollingTimerId != -1)
+        try
         {
-            LOGGER.warn("Polling already running. Ignoring new start request.");
+            if (pollingTimerId != -1)
+            {
+                LOGGER.warn("Polling already running. Ignoring new start request.");
 
-            return Future.failedFuture("Polling already running");
-        }
+                return Future.failedFuture("Polling already running");
+            }
 
-        pollingTimerId = vertx.setPeriodic(interval, id ->
-        {
-            LOGGER.info("Running scheduled polling task");
+            pollingTimerId = vertx.setPeriodic(interval, id ->
+            {
+                LOGGER.info("Running scheduled polling task");
 
-            var request = new JsonObject()
-                    .put("query", DATA_TO_PLUGIN_FOR_POLLING)
-                    .put("params", Collections.emptyList());
+                var request = new JsonObject()
+                        .put("query", DATA_TO_PLUGIN_FOR_POLLING)
+                        .put("params", Collections.emptyList());
 
-            databaseService.executeQuery(request)
-                    .onSuccess(dbResponse ->
-                    {
-                        if (!dbResponse.getBoolean("success"))
+                databaseService.executeQuery(request)
+                        .onSuccess(dbResponse ->
                         {
-                            LOGGER.warn("DB query failed: " + dbResponse.getString("error"));
-
-                            return;
-                        }
-
-                        var devices = new JsonArray();
-
-                        var rows = dbResponse.getJsonArray("rows", new JsonArray());
-
-                        for (var rowObj : rows)
-                        {
-                            var row = (JsonObject) rowObj;
-
-                            try
+                            if (!dbResponse.getBoolean("success"))
                             {
-                                var device = new JsonObject()
-                                        .put(ID, row.getInteger(ID))
-                                        .put(PORT, row.getInteger(PORT))
-                                        .put(IP, row.getString(IP))
-                                        .put(USERNAME, row.getString(USERNAME))
-                                        .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)));
+                                LOGGER.warn("DB query failed: " + dbResponse.getString("error"));
 
-                                devices.add(device);
+                                return;
                             }
-                            catch (Exception e)
+
+                            var devices = new JsonArray();
+
+                            var rows = dbResponse.getJsonArray("rows", new JsonArray());
+
+                            for (var rowObj : rows)
                             {
-                                LOGGER.error("Failed to process device: " + e.getMessage());
-                            }
-                        }
+                                var row = (JsonObject) rowObj;
 
-                        if (devices.isEmpty())
-                        {
-                            LOGGER.info("No devices found for polling");
-
-                            return;
-                        }
-
-                        PingUtil.filterReachableDevicesAsync(vertx, devices)
-                                .onFailure(err -> LOGGER.error("Ping filtering failed: " + err.getMessage()))
-                                .onSuccess(pingedDevices ->
+                                try
                                 {
-                                    var availabilityParams = new ArrayList<>();
+                                    var device = new JsonObject()
+                                            .put(ID, row.getInteger(ID))
+                                            .put(PORT, row.getInteger(PORT))
+                                            .put(IP, row.getString(IP))
+                                            .put(USERNAME, row.getString(USERNAME))
+                                            .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)));
 
-                                    var reachableIds = pingedDevices.stream()
-                                            .map(dev -> ((JsonObject) dev).getInteger(ID))
-                                            .collect(Collectors.toSet());
+                                    devices.add(device);
+                                }
+                                catch (Exception e)
+                                {
+                                    LOGGER.error("Failed to process device: " + e.getMessage());
+                                }
+                            }
 
-                                    for (var i = 0; i < devices.size(); i++)
+                            if (devices.isEmpty())
+                            {
+                                LOGGER.info("No devices found for polling");
+
+                                return;
+                            }
+
+                            PingUtil.filterReachableDevices(vertx, devices)
+                                    .onFailure(err -> LOGGER.error("Ping filtering failed: " + err.getMessage()))
+                                    .onSuccess(pingedDevices ->
                                     {
-                                        var deviceId = devices.getJsonObject(i).getInteger(ID);
+                                        var availabilityParams = new ArrayList<>();
 
-                                        availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
-                                    }
+                                        var reachableIds = pingedDevices.stream()
+                                                .map(dev -> ((JsonObject) dev).getInteger(ID))
+                                                .collect(Collectors.toSet());
 
-                                    databaseService.executeBatch(new JsonObject()
-                                                    .put("query", ADD_AVAILABILITY_DATA)
-                                                    .put("params", new JsonArray(availabilityParams)))
-                                            .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
-                                            .onFailure(err -> LOGGER.error("Availability insert failed: " + err.getMessage()));
+                                        for (var i = 0; i < devices.size(); i++)
+                                        {
+                                            var deviceId = devices.getJsonObject(i).getInteger(ID);
 
-                                    if (pingedDevices.isEmpty())
-                                    {
-                                        LOGGER.info("No devices reachable via ping. Skipping SSH polling.");
+                                            availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
+                                        }
 
-                                        return;
-                                    }
+                                        databaseService.executeBatch(new JsonObject()
+                                                        .put("query", ADD_AVAILABILITY_DATA)
+                                                        .put("params", new JsonArray(availabilityParams)))
+                                                .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
+                                                .onFailure(err -> LOGGER.error("Availability insert failed: " + err.getMessage()));
 
-                                    PluginOperationsUtil.runSSHMetrics(pingedDevices)
-                                            .onSuccess(metricsResults ->
-                                            {
-                                                LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
+                                        if (pingedDevices.isEmpty())
+                                        {
+                                            LOGGER.info("No devices reachable via ping. Skipping SSH polling.");
 
-                                                var batchParams = new ArrayList<>();
+                                            return;
+                                        }
 
-                                                for (var i = 0; i < metricsResults.size(); i++)
+                                        PluginOperationsUtil.runSSHMetrics(pingedDevices)
+                                                .onSuccess(metricsResults ->
                                                 {
-                                                    var result = metricsResults.getJsonObject(i);
+                                                    LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
 
-                                                    var deviceId = result.getInteger("id");
+                                                    var batchParams = new ArrayList<>();
 
-                                                    var metrics = result.copy();
+                                                    for (var i = 0; i < metricsResults.size(); i++)
+                                                    {
+                                                        var result = metricsResults.getJsonObject(i);
 
-                                                    metrics.remove("id");
+                                                        var deviceId = result.getInteger("id");
 
-                                                    batchParams.add(List.of(deviceId, metrics.encode()));
-                                                }
+                                                        var metrics = result.copy();
 
-                                                databaseService.executeBatch(new JsonObject()
-                                                                .put("query", INSERT_POLLING_RESULT)
-                                                                .put("params", new JsonArray(batchParams)))
-                                                        .onSuccess(batchResponse ->
-                                                        {
-                                                            if (batchResponse.getBoolean("success"))
+                                                        metrics.remove("id");
+
+                                                        batchParams.add(List.of(deviceId, metrics.encode()));
+                                                    }
+
+                                                    databaseService.executeBatch(new JsonObject()
+                                                                    .put("query", INSERT_POLLING_RESULT)
+                                                                    .put("params", new JsonArray(batchParams)))
+                                                            .onSuccess(batchResponse ->
                                                             {
-                                                                LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
-                                                            }
-                                                            else
-                                                            {
-                                                                LOGGER.warn("Batch insert failed: " + batchResponse.getString("error"));
-                                                            }
-                                                        })
-                                                        .onFailure(err -> LOGGER.error("Batch insert failed: " + err.getMessage()));
-                                            })
-                                            .onFailure(err -> LOGGER.error("Plugin polling failed: " + err.getMessage()));
-                                });
-                    })
-                    .onFailure(err -> LOGGER.error("DB query failed: " + err.getMessage()));
-        });
+                                                                if (batchResponse.getBoolean("success"))
+                                                                {
+                                                                    LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
+                                                                }
+                                                                else
+                                                                {
+                                                                    LOGGER.warn("Batch insert failed: " + batchResponse.getString("error"));
+                                                                }
+                                                            })
+                                                            .onFailure(err -> LOGGER.error("Batch insert failed: " + err.getMessage()));
+                                                })
+                                                .onFailure(err -> LOGGER.error("Plugin polling failed: " + err.getMessage()));
+                                    });
+                        })
+                        .onFailure(err -> LOGGER.error("DB query failed: " + err.getMessage()));
+            });
 
-        LOGGER.info("Polling scheduled every " + interval + "ms");
+            LOGGER.info("Polling scheduled every " + interval + "ms");
 
-        return Future.succeededFuture("Polling scheduled");
+            return Future.succeededFuture("Polling scheduled");
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Failed to start polling: " +  e.getMessage());
+
+            return Future.failedFuture("Failed to start polling: " + e.getMessage());
+        }
     }
 }

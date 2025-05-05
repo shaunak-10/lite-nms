@@ -31,156 +31,207 @@ public class ProvisionHandler extends AbstractCrudHandler
     @Override
     public void add(RoutingContext ctx)
     {
-        var body = ctx.body().asJsonObject();
-
-        if (body == null)
+        try
         {
-            handleMissingData(ctx, INVALID_JSON_BODY);
+            var body = ctx.body().asJsonObject();
 
-            return;
-        }
+            if (body == null)
+            {
+                handleMissingData(ctx, INVALID_JSON_BODY);
 
-        var discoveryProfileId = body.getInteger(DISCOVERY_PROFILE_ID);
+                return;
+            }
 
-        if (discoveryProfileId == null)
-        {
-            handleMissingData(ctx, MISSING_FIELDS);
+            var discoveryProfileId = body.getInteger(DISCOVERY_PROFILE_ID);
 
-            return;
-        }
+            if (discoveryProfileId == null)
+            {
+                handleMissingData(ctx, MISSING_FIELDS);
 
-        LOGGER.info("Fetching discovery profile with ID: " + discoveryProfileId);
+                return;
+            }
 
-        executeQuery(GET_DISCOVERY_BY_ID, List.of(discoveryProfileId))
-                .onSuccess(result ->
-                {
-                    var rows = result.getJsonArray("rows");
+            LOGGER.info("Fetching discovery profile with ID: " + discoveryProfileId);
 
-                    if (rows == null || rows.isEmpty())
+            executeQuery(GET_DISCOVERY_BY_ID, List.of(discoveryProfileId))
+                    .onSuccess(result ->
                     {
-                        handleNotFound(ctx);
+                        try
+                        {
+                            var rows = result.getJsonArray("rows");
 
-                        return;
-                    }
-
-                    var discoveryProfile = rows.getJsonObject(0);
-
-                    var status = discoveryProfile.getString(STATUS);
-
-                    if (!ACTIVE.equalsIgnoreCase(status))
-                    {
-                        handleInvalidData(ctx, DEVICE_NOT_DISCOVERED);
-
-                        return;
-                    }
-
-                    var name = discoveryProfile.getString(NAME);
-
-                    var ip = discoveryProfile.getString(IP);
-
-                    var port = discoveryProfile.getInteger(PORT);
-
-                    var credentialProfileId = discoveryProfile.getInteger(CREDENTIAL_PROFILE_ID);
-
-                    LOGGER.info("Inserting provisioned device copied from discovery profile ID: " + discoveryProfileId);
-
-                    executeQuery(ADD_PROVISION, List.of(name, ip, port, credentialProfileId))
-                            .onSuccess(insertResult ->
+                            if (rows == null || rows.isEmpty())
                             {
-                                var insertRows = insertResult.getJsonArray("rows");
+                                handleNotFound(ctx,new JsonObject().put(ERROR, NOT_FOUND));
 
-                                if (insertRows != null && !insertRows.isEmpty())
-                                {
-                                    var id = insertRows.getJsonObject(0).getInteger(ID);
+                                return;
+                            }
 
-                                    LOGGER.info("Provisioned device added with ID: " + id);
+                            var discoveryProfile = rows.getJsonObject(0);
 
-                                    handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
-                                }
-                                else
-                                {
-                                    LOGGER.error("Insert succeeded but no ID returned.");
+                            if (!ACTIVE.equalsIgnoreCase(discoveryProfile.getString(STATUS)))
+                            {
+                                handleInvalidData(ctx, DEVICE_NOT_DISCOVERED);
 
-                                    handleMissingData(ctx,"Insert succeeded but no ID returned.");
-                                }
-                            })
-                            .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+                                return;
+                            }
+
+                            LOGGER.info("Inserting provisioned device copied from discovery profile ID: " + discoveryProfileId);
+
+                            executeQuery(ADD_PROVISION, List.of(discoveryProfile.getString(NAME),
+                                    discoveryProfile.getString(IP),
+                                    discoveryProfile.getInteger(PORT),
+                                    discoveryProfile.getInteger(CREDENTIAL_PROFILE_ID)))
+                                    .onSuccess(insertResult ->
+                                    {
+                                        try
+                                        {
+                                            var insertRows = insertResult.getJsonArray("rows");
+
+                                            if (insertRows != null && !insertRows.isEmpty())
+                                            {
+                                                var id = insertRows.getJsonObject(0).getInteger(ID);
+
+                                                LOGGER.info("Provisioned device added with ID: " + id);
+
+                                                handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
+                                            }
+                                            else
+                                            {
+                                                LOGGER.error("Insert succeeded but no ID returned.");
+
+                                                handleMissingData(ctx,"Insert succeeded but no ID returned.");
+                                            }
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            LOGGER.error("Error while processing result: " + e.getMessage());
+                                        }
+                                    })
+                                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing result: " + e.getMessage());
+                        }
+
+                    })
+                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while adding provisioned device: " + e.getMessage());
+        }
+
     }
 
     @Override
     public void list(RoutingContext ctx)
     {
-        LOGGER.info("Fetching provisioned device list");
+        try
+        {
+            LOGGER.info("Fetching provisioned device list");
 
-        executeQuery(GET_ALL_PROVISIONS)
-                .onSuccess(result ->
-                {
-                    var rows = result.getJsonArray("rows", new JsonArray());
-
-                    var provisionList = new JsonArray();
-
-                    for (var i = 0; i < rows.size(); i++)
+            executeQuery(GET_ALL_PROVISIONS)
+                    .onSuccess(result ->
                     {
-                        var row = rows.getJsonObject(i);
+                        try
+                        {
+                            var rows = result.getJsonArray("rows", new JsonArray());
 
-                        var provision = new JsonObject()
-                                .put(ID, row.getInteger(ID))
-                                .put(NAME, row.getString(NAME))
-                                .put(IP, row.getString(IP))
-                                .put(PORT, row.getInteger(PORT))
-                                .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
-                                .put("availability_percent", row.getDouble("availability_percent", 0.0))
-                                .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
+                            var provisionList = new JsonArray();
 
-                        provisionList.add(provision);
-                    }
+                            for (var i = 0; i < rows.size(); i++)
+                            {
+                                try
+                                {
+                                    var row = rows.getJsonObject(i);
 
-                    LOGGER.info("Fetched " + provisionList.size() + " provisioned devices");
+                                    var provision = new JsonObject()
+                                            .put(ID, row.getInteger(ID))
+                                            .put(NAME, row.getString(NAME))
+                                            .put(IP, row.getString(IP))
+                                            .put(PORT, row.getInteger(PORT))
+                                            .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
+                                            .put("availability_percent", row.getDouble("availability_percent", 0.0))
+                                            .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
 
-                    handleSuccess(ctx, new JsonObject().put("provisions", provisionList));
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+                                    provisionList.add(provision);
+                                }
+                                catch (Exception e)
+                                {
+                                    LOGGER.error("Failed to process provisioned device: " + e.getMessage());
+                                }
+                            }
+
+                            LOGGER.info("Fetched " + provisionList.size() + " provisioned devices");
+
+                            handleSuccess(ctx, new JsonObject().put("provisions", provisionList));
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing result: " + e.getMessage());
+                        }
+                    })
+                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while fetching provisioned devices: " + e.getMessage());
+        }
+
     }
 
     @Override
     public void getById(RoutingContext ctx)
     {
-        System.out.println(ctx);
+        try
+        {
+            var id = validateIdFromPath(ctx);
 
-        var id = validateIdFromPath(ctx);
+            if (id == -1) return;
 
-        if (id == -1) return;
+            LOGGER.info("Fetching provisioned device with ID: " + id);
 
-        LOGGER.info("Fetching provisioned device with ID: " + id);
-
-        executeQuery(GET_PROVISION_BY_ID, List.of(id))
-                .onSuccess(result ->
-                {
-                    var rows = result.getJsonArray("rows", new JsonArray());
-
-                    if (rows.isEmpty())
+            executeQuery(GET_PROVISION_BY_ID, List.of(id))
+                    .onSuccess(result ->
                     {
-                        handleNotFound(ctx);
-                    }
-                    else
-                    {
-                        var row = rows.getJsonObject(0);
+                        try
+                        {
+                            var rows = result.getJsonArray("rows", new JsonArray());
 
-                        var provision = new JsonObject()
-                                .put(ID, row.getInteger(ID))
-                                .put(NAME, row.getString(NAME))
-                                .put(IP, row.getString(IP))
-                                .put(PORT, row.getInteger(PORT))
-                                .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
-                                .put("availability_percent", row.getDouble("availability_percent", 0.0))
-                                .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
+                            if (rows.isEmpty())
+                            {
+                                handleNotFound(ctx,new JsonObject().put(ERROR, NOT_FOUND));
+                            }
+                            else
+                            {
+                                var row = rows.getJsonObject(0);
 
-                        handleSuccess(ctx, provision);
-                    }
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+                                var provision = new JsonObject()
+                                        .put(ID, row.getInteger(ID))
+                                        .put(NAME, row.getString(NAME))
+                                        .put(IP, row.getString(IP))
+                                        .put(PORT, row.getInteger(PORT))
+                                        .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
+                                        .put("availability_percent", row.getDouble("availability_percent", 0.0))
+                                        .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
+
+                                handleSuccess(ctx, provision);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing result: " + e.getMessage());
+                        }
+                    })
+                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while fetching provisioned device by ID: " + e.getMessage());
+        }
+
     }
 
     @Override
@@ -192,28 +243,42 @@ public class ProvisionHandler extends AbstractCrudHandler
     @Override
     public void delete(RoutingContext ctx)
     {
-        var id = validateIdFromPath(ctx);
+        try
+        {
+            var id = validateIdFromPath(ctx);
 
-        if (id == -1) return;
+            if (id == -1) return;
 
-        LOGGER.info("Deleting provisioned device with ID: " + id);
+            LOGGER.info("Deleting provisioned device with ID: " + id);
 
-        executeQuery(DELETE_PROVISION, List.of(id))
-                .onSuccess(result ->
-                {
-                    var rowCount = result.getInteger("rowCount", 0);
-
-                    if (rowCount == 0)
+            executeQuery(DELETE_PROVISION, List.of(id))
+                    .onSuccess(result ->
                     {
-                        handleNotFound(ctx);
-                    }
-                    else
-                    {
-                        LOGGER.info("Provisioned device deleted with ID: " + id);
+                        try
+                        {
+                            var rowCount = result.getInteger("rowCount", 0);
 
-                        handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
-                    }
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
+                            if (rowCount == 0)
+                            {
+                                handleNotFound(ctx,new JsonObject().put(ERROR, NOT_FOUND));
+                            }
+                            else
+                            {
+                                LOGGER.info("Provisioned device deleted with ID: " + id);
+
+                                handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing result: " + e.getMessage());
+                        }
+                    })
+                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while deleting provisioned device: " + e.getMessage());
+        }
     }
 }

@@ -45,70 +45,78 @@ public class HttpServerVerticle extends AbstractVerticle
             //demo login
             router.post("/login").handler(ctx ->
             {
-                var body = ctx.body().asJsonObject();
-
-                var username = body.getString("username");
-
-                var password = body.getString("password");
-
-                if ("shaunak".equals(username) && "Mind@123".equals(password))
+                try
                 {
-                    var claims = new JsonObject()
-                            .put("username", username)
-                            .put("role", "admin");
+                    var body = ctx.body().asJsonObject();
 
-                    // Access Token - short-lived
-                    var accessToken = jwtAuth.generateToken(claims, new JWTOptions().setExpiresInMinutes(15));
+                    var username = body.getString("username");
 
-                    // Refresh Token - long-lived
-                    var refreshToken = jwtAuth.generateToken(claims, new JWTOptions().setExpiresInMinutes(60 * 24 * 7)); // 7 days
+                    if ("shaunak".equals(username) && "Mind@123".equals(body.getString("password")))
+                    {
+                        var claims = new JsonObject()
+                                .put("username", username)
+                                .put("role", "admin");
 
-                    ctx.response()
-                            .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                            .putHeader("Set-Cookie", "refresh_token=" + refreshToken +
-                                    "; HttpOnly; SameSite=Strict; Path=/refresh") // Secure in production
-                            .end(new JsonObject().put("access_token", accessToken).encodePrettily());
+                        ctx.response()
+                                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
+                                .putHeader("Set-Cookie", "refresh_token=" + jwtAuth.generateToken(claims, new JWTOptions().setExpiresInMinutes(60 * 24 * 7)) +
+                                        "; HttpOnly; SameSite=Strict; Path=/refresh") // Secure in production
+                                .end(new JsonObject().put("access_token", jwtAuth.generateToken(claims, new JWTOptions().setExpiresInMinutes(15))).encodePrettily());
+                    }
+                    else
+                    {
+                        ctx.response().setStatusCode(401).end("Invalid credentials");
+                    }
                 }
-                else
+                catch (Exception e)
                 {
-                    ctx.response().setStatusCode(401).end("Invalid credentials");
+                    LOGGER.error(e.getMessage());
                 }
             });
 
             router.post("/refresh").handler(ctx ->
             {
-                var cookies = ctx.request().cookies();
-
-                var refreshCookie = cookies.stream()
-                        .filter(c -> c.getName().equals("refresh_token"))
-                        .findFirst();
-
-                if (refreshCookie.isEmpty())
+                try
                 {
-                    ctx.response().setStatusCode(401).end("Missing refresh token");
+                    var refreshCookie = ctx.request().cookies().stream()
+                            .filter(c -> c.getName().equals("refresh_token"))
+                            .findFirst();
 
-                    return;
+                    if (refreshCookie.isEmpty())
+                    {
+                        ctx.response().setStatusCode(401).end("Missing refresh token");
+
+                        return;
+                    }
+
+                    jwtAuth.authenticate(new JsonObject().put("token", refreshCookie.get().getValue())).onSuccess(user ->
+                    {
+                        try
+                        {
+                            var claims = user.principal();
+
+                            var newAccessToken = jwtAuth.generateToken(
+                                    new JsonObject()
+                                            .put("username", claims.getString("username"))
+                                            .put("role", claims.getString("role")),
+                                    new JWTOptions().setExpiresInMinutes(15)
+                            );
+
+                            ctx.response()
+                                    .putHeader("Content-Type", "application/json")
+                                    .end(new JsonObject().put("access_token", newAccessToken).encodePrettily());
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error(e.getMessage());
+                        }
+                    }).onFailure(err -> ctx.response().setStatusCode(401).end("Invalid or expired refresh token"));
+                }
+                catch (Exception e)
+                {
+                    LOGGER.error(e.getMessage());
                 }
 
-                var refreshToken = refreshCookie.get().getValue();
-
-                jwtAuth.authenticate(new JsonObject().put("token", refreshToken)).onSuccess(user ->
-                {
-                    var claims = user.principal();
-
-                    var newAccessToken = jwtAuth.generateToken(
-                            new JsonObject()
-                                    .put("username", claims.getString("username"))
-                                    .put("role", claims.getString("role")),
-                            new JWTOptions().setExpiresInMinutes(15)
-                    );
-
-                    ctx.response()
-                            .putHeader("Content-Type", "application/json")
-                            .end(new JsonObject().put("access_token", newAccessToken).encodePrettily());
-                }).onFailure(err -> {
-                    ctx.response().setStatusCode(401).end("Invalid or expired refresh token");
-                });
             });
 
 
@@ -126,16 +134,23 @@ public class HttpServerVerticle extends AbstractVerticle
 
             router.route().failureHandler(ctx ->
             {
-                if (ctx.statusCode() == 401)
+                try
                 {
-                    ctx.response()
-                            .setStatusCode(401)
-                            .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                            .end(new JsonObject().put("error", "Unauthorized: Please login first").encodePrettily());
+                    if (ctx.statusCode() == 401)
+                    {
+                        ctx.response()
+                                .setStatusCode(401)
+                                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
+                                .end(new JsonObject().put("error", "Unauthorized: Please login first").encodePrettily());
+                    }
+                    else
+                    {
+                        ctx.next();
+                    }
                 }
-                else
+                catch (Exception e)
                 {
-                    ctx.next(); // let Vert.x handle other errors as usual
+                    LOGGER.error(e.getMessage());
                 }
             });
 
@@ -143,13 +158,22 @@ public class HttpServerVerticle extends AbstractVerticle
                     .requestHandler(router)
                     .listen(8888, http ->
                     {
-                        if (http.succeeded())
+                        try
                         {
-                            startPromise.complete();
+                            if (http.succeeded())
+                            {
+                                startPromise.complete();
+                            }
+                            else
+                            {
+                                startPromise.fail(http.cause());
+                            }
                         }
-                        else
+                        catch (Exception e)
                         {
-                            startPromise.fail(http.cause());
+                            LOGGER.error(e.getMessage());
+
+                            startPromise.fail(e.getMessage());
                         }
                     });
         }

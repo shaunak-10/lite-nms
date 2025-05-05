@@ -17,49 +17,73 @@ import static org.example.constants.AppConstants.AddressesAndPaths.CONFIG_FILE_P
 
 public class MainApp
 {
-    public static Vertx vertx = Vertx.vertx();
+    private static Vertx vertx = Vertx.vertx();
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MainApp.class);
 
+    public static Vertx getVertx()
+    {
+        return vertx;
+    }
+
     public static void main(String[] args)
     {
+
         try
         {
             DatabaseClient.testConnection(dbRes ->
             {
-                ConfigLoader.init(CONFIG_FILE_PATH);
-
-                if (dbRes.failed())
+                try
                 {
-                    LOGGER.error("❌ Failed to connect to DB: " + dbRes.cause());
+                    ConfigLoader.init(CONFIG_FILE_PATH);
 
-                    vertx.close();
-
-                    return;
-                }
-
-                LOGGER.info("✅ Database connected successfully!");
-
-                DatabaseClient.createTablesIfNotExist(tableRes ->
-                {
-                    if (tableRes.failed())
+                    if (dbRes.failed())
                     {
-                        LOGGER.error("❌ Failed to create tables: " + tableRes.cause().getMessage());
+                        LOGGER.error("❌ Failed to connect to DB: " + dbRes.cause());
 
                         vertx.close();
 
                         return;
                     }
 
-                    LOGGER.info("📦 Tables created or already exist.");
+                    LOGGER.info("✅ Database connected successfully!");
 
-                    deployAllVerticles(vertx)
-                            .onSuccess(v -> LOGGER.info("🚀 All verticles deployed successfully!"))
-                            .onFailure(err -> {
-                                LOGGER.error("❌ Failed to deploy verticles: " + err.getMessage());
+                    DatabaseClient.createTablesIfNotExist(tableRes ->
+                    {
+                        try
+                        {
+                            if (tableRes.failed())
+                            {
+                                LOGGER.error("❌ Failed to create tables: " + tableRes.cause().getMessage());
+
                                 vertx.close();
-                            });
-                });
+
+                                return;
+                            }
+
+                            LOGGER.info("📦 Tables created or already exist.");
+
+                            deployAllVerticles(vertx)
+                                    .onSuccess(v -> LOGGER.info("🚀 All verticles deployed successfully!"))
+                                    .onFailure(err -> {
+                                        LOGGER.error("❌ Failed to deploy verticles: " + err.getMessage());
+                                        vertx.close();
+                                    });
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("❌ Failed to create tables: " + e.getMessage());
+
+                            vertx.close();
+                        }
+                    });
+                }
+                catch (Exception e)
+                {
+                    LOGGER.error("❌ Failed to load config file: " + e.getMessage());
+
+                    vertx.close();
+                }
             });
         }
         catch (Exception e)

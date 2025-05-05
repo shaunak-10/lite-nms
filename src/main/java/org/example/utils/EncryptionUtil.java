@@ -28,14 +28,10 @@ public class EncryptionUtil
         // Generate random IV
         var iv = new byte[16];
 
-        var random = new SecureRandom();
-
-        random.nextBytes(iv);
-
-        var ivSpec = new IvParameterSpec(iv);
+        new SecureRandom().nextBytes(iv);
 
         // Encrypt
-        cipher.init(Cipher.ENCRYPT_MODE, KEY_SPEC, ivSpec);
+        cipher.init(Cipher.ENCRYPT_MODE, KEY_SPEC, new IvParameterSpec(iv));
 
         var encrypted = cipher.doFinal(plainText.getBytes());
 

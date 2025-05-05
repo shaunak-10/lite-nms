@@ -5,10 +5,12 @@ import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.example.MainApp;
 import org.example.services.discovery.DiscoveryVerticle;
 import org.example.utils.*;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static org.example.constants.AppConstants.CredentialField.NAME;
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
@@ -46,64 +48,66 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             LOGGER.info("Adding new discovery profile: " + body.encode());
 
-            IpResolutionUtil.resolveAndValidateIp(ctx.vertx(), body.getString(IP))
+            if (isNotValidPort(port))
+            {
+                handleInvalidData(ctx, INVALID_PORT);
+
+                return;
+            }
+
+            MainApp.getVertx().executeBlocking(() -> IpResolutionUtil.resolveAndValidateIp(body.getString(IP)))
+                    .timeout(ConfigLoader.get().getInteger("ip.resolution.timeout"), TimeUnit.MILLISECONDS)
                     .onSuccess(validIp ->
                     {
-                        if (validIp == null)
+                        try
                         {
-                            handleInvalidData(ctx, INVALID_IP);
+                            if (validIp == null)
+                            {
+                                handleInvalidData(ctx, INVALID_IP);
 
-                            return;
+                                return;
+                            }
+
+                            executeQuery(ADD_DISCOVERY, List.of(body.getString(NAME), validIp, port, INACTIVE, credentialProfileId))
+                                    .onSuccess(result ->
+                                    {
+                                        try
+                                        {
+                                            var rows = result.getJsonArray("rows");
+
+                                            if (rows != null && !rows.isEmpty())
+                                            {
+                                                var id = rows.getJsonObject(0).getInteger(ID);
+
+                                                LOGGER.info("Discovery profile added with ID: " + id);
+
+                                                ctx.vertx().eventBus().send(DiscoveryVerticle.SERVICE_ADDRESS, new JsonObject()
+                                                        .put("action", "fetchDeviceDetailsAndRunDiscovery")
+                                                        .put("discoveryId", id)
+                                                        .put("ip", validIp)
+                                                        .put("port", port)
+                                                        .put("credentialProfileId", credentialProfileId));
+
+                                                handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
+                                            }
+                                            else
+                                            {
+                                                LOGGER.error("Insert succeeded but no ID returned.");
+
+                                                handleMissingData(ctx, "Insert succeeded but no ID returned.");
+                                            }
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            LOGGER.error("Error while processing result: " + e.getMessage());
+                                        }
+                                    })
+                                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
                         }
-
-                        if (isNotValidPort(port))
+                        catch (Exception e)
                         {
-                            handleInvalidData(ctx, INVALID_PORT);
-
-                            return;
+                            LOGGER.error("Error while resolving IP: " + e.getMessage());
                         }
-
-                        executeQuery(ADD_DISCOVERY, List.of(body.getString(NAME), validIp, port, INACTIVE, credentialProfileId))
-                                .onSuccess(result ->
-                                {
-                                    var rows = result.getJsonArray("rows");
-
-                                    if (rows != null && !rows.isEmpty())
-                                    {
-                                        var id = rows.getJsonObject(0).getInteger(ID);
-
-                                        LOGGER.info("Discovery profile added with ID: " + id);
-
-                                        var discoveryRequest = new JsonObject()
-                                                .put("action", "fetchDeviceDetailsAndRunDiscovery")
-                                                .put("discoveryId", id)
-                                                .put("ip", validIp)
-                                                .put("port", port)
-                                                .put("credentialProfileId", credentialProfileId);
-
-                                        ctx.vertx().eventBus().request(DiscoveryVerticle.SERVICE_ADDRESS, discoveryRequest,
-                                                ar ->
-                                                {
-                                                    if (ar.failed())
-                                                    {
-                                                        LOGGER.error("Error during discovery process: " + ar.cause().getMessage());
-                                                    }
-                                                    else
-                                                    {
-                                                        LOGGER.info("Discovery process initiated successfully for ID: " + id);
-                                                    }
-                                                });
-
-                                        handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
-                                    }
-                                    else
-                                    {
-                                        LOGGER.error("Insert succeeded but no ID returned.");
-
-                                        handleMissingData(ctx,"Insert succeeded but no ID returned.");
-                                    }
-                                })
-                                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
                     })
                     .onFailure(err ->
                     {
@@ -115,75 +119,110 @@ public class DiscoveryHandler extends AbstractCrudHandler
         catch (Exception e)
         {
             LOGGER.error("Invalid input in add(): " + e.getMessage());
-
-            handleInvalidData(ctx, INVALID_JSON_BODY);
         }
     }
 
     @Override
     public void list(RoutingContext ctx)
     {
-        LOGGER.info("Fetching discovery profile list");
+        try
+        {
+            LOGGER.info("Fetching discovery profile list");
 
-        executeQuery(GET_ALL_DISCOVERY)
-                .onSuccess(result ->
-                {
-                    var rows = result.getJsonArray("rows", new JsonArray());
-
-                    var discoveryList = new JsonArray();
-
-                    for (var i = 0; i < rows.size(); i++)
+            executeQuery(GET_ALL_DISCOVERY)
+                    .onSuccess(result ->
                     {
-                        var row = rows.getJsonObject(i);
+                        try
+                        {
+                            var rows = result.getJsonArray("rows", new JsonArray());
 
-                        discoveryList.add(new JsonObject()
-                                .put(ID, row.getInteger(ID))
-                                .put(NAME, row.getString(NAME))
-                                .put(IP, row.getString(IP))
-                                .put(PORT, row.getInteger(PORT))
-                                .put(STATUS, row.getString(STATUS))
-                                .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
-                    }
+                            var discoveryList = new JsonArray();
 
-                    LOGGER.info("Fetched " + discoveryList.size() + " discovery profiles");
+                            for (var i = 0; i < rows.size(); i++)
+                            {
+                                try
+                                {
+                                    var row = rows.getJsonObject(i);
 
-                    handleSuccess(ctx, new JsonObject().put(DISCOVERIES, discoveryList));
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+                                    discoveryList.add(new JsonObject()
+                                            .put(ID, row.getInteger(ID))
+                                            .put(NAME, row.getString(NAME))
+                                            .put(IP, row.getString(IP))
+                                            .put(PORT, row.getInteger(PORT))
+                                            .put(STATUS, row.getString(STATUS))
+                                            .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
+                                }
+                                catch (Exception e)
+                                {
+                                    LOGGER.error("Error while processing row: " + e.getMessage());
+                                }
+                            }
+
+                            LOGGER.info("Fetched " + discoveryList.size() + " discovery profiles");
+
+                            handleSuccess(ctx, new JsonObject().put(DISCOVERIES, discoveryList));
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing result: " + e.getMessage());
+                        }
+                    })
+                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while fetching discovery profiles: " + e.getMessage());
+        }
+
     }
 
     @Override
     public void getById(RoutingContext ctx)
     {
-        var id = validateIdFromPath(ctx);
+        try
+        {
+            var id = validateIdFromPath(ctx);
 
-        if (id == -1) return;
+            if (id == -1) return;
 
-        LOGGER.info("Fetching discovery profile with ID: " + id);
+            LOGGER.info("Fetching discovery profile with ID: " + id);
 
-        executeQuery(GET_DISCOVERY_BY_ID, List.of(id))
-                .onSuccess(result ->
-                {
-                    var rows = result.getJsonArray("rows", new JsonArray());
-
-                    if (rows.isEmpty())
+            executeQuery(GET_DISCOVERY_BY_ID, List.of(id))
+                    .onSuccess(result ->
                     {
-                        handleNotFound(ctx);
-                    }
-                    else
-                    {
-                        var row = rows.getJsonObject(0);
+                        try
+                        {
+                            var rows = result.getJsonArray("rows", new JsonArray());
 
-                        handleSuccess(ctx, new JsonObject()
-                                .put(ID, row.getInteger(ID))
-                                .put(NAME, row.getString(NAME))
-                                .put(IP, row.getString(IP))
-                                .put(PORT, row.getInteger(PORT))
-                                .put(STATUS, row.getString(STATUS))
-                                .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
-                    }
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+                            if (rows.isEmpty())
+                            {
+                                handleNotFound(ctx,new JsonObject().put(ERROR, NOT_FOUND));
+                            }
+                            else
+                            {
+                                var row = rows.getJsonObject(0);
+
+                                handleSuccess(ctx, new JsonObject()
+                                        .put(ID, row.getInteger(ID))
+                                        .put(NAME, row.getString(NAME))
+                                        .put(IP, row.getString(IP))
+                                        .put(PORT, row.getInteger(PORT))
+                                        .put(STATUS, row.getString(STATUS))
+                                        .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing result: " + e.getMessage());
+                        }
+                    })
+                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while fetching discovery profile: " + e.getMessage());
+        }
+
     }
 
     public void update(RoutingContext ctx)
@@ -200,20 +239,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             LOGGER.info("Updating discovery profile ID " + id + " with data: " + body.encode());
 
-            var name = body.getString(NAME);
-
-            var ip = body.getString(IP);
-
             var port = body.getInteger(PORT, 22);
-
-            var credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
-
-            if (name == null || ip == null || credentialProfileId == 0)
-            {
-                handleMissingData(ctx, MISSING_FIELDS);
-
-                return;
-            }
 
             if (isNotValidPort(port))
             {
@@ -222,33 +248,48 @@ public class DiscoveryHandler extends AbstractCrudHandler
                 return;
             }
 
-            IpResolutionUtil.resolveAndValidateIp(ctx.vertx(), ip)
+            MainApp.getVertx().executeBlocking(() -> IpResolutionUtil.resolveAndValidateIp(body.getString(IP)))
+                    .timeout(ConfigLoader.get().getInteger("ip.resolution.timeout"), TimeUnit.MILLISECONDS)
                     .onSuccess(validIp ->
                     {
-                        if (validIp == null)
+                        try
                         {
-                            handleInvalidData(ctx, INVALID_IP);
+                            if (validIp == null)
+                            {
+                                handleInvalidData(ctx, INVALID_IP);
 
-                            return;
+                                return;
+                            }
+
+                            executeQuery(UPDATE_DISCOVERY, List.of(body.getString(NAME), validIp, port, body.getInteger(CREDENTIAL_PROFILE_ID), id))
+                                    .onSuccess(result ->
+                                    {
+                                        try
+                                        {
+                                            var rowCount = result.getInteger("rowCount", 0);
+
+                                            if (rowCount == 0)
+                                            {
+                                                handleNotFound(ctx, new JsonObject().put(ERROR, NOT_FOUND));
+                                            }
+                                            else
+                                            {
+                                                LOGGER.info("Discovery profile updated successfully for ID " + id);
+
+                                                handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
+                                            }
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            LOGGER.error("Error while processing result: " + e.getMessage());
+                                        }
+                                    })
+                                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_UPDATE, cause));
                         }
-
-                        executeQuery(UPDATE_DISCOVERY, List.of(name, validIp, port, credentialProfileId, id))
-                                .onSuccess(result ->
-                                {
-                                    var rowCount = result.getInteger("rowCount", 0);
-
-                                    if (rowCount == 0)
-                                    {
-                                        handleNotFound(ctx);
-                                    }
-                                    else
-                                    {
-                                        LOGGER.info("Discovery profile updated successfully for ID " + id);
-
-                                        handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
-                                    }
-                                })
-                                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_UPDATE, cause));
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while resolving IP: " + e.getMessage());
+                        }
                     })
                     .onFailure(err ->
                     {
@@ -260,61 +301,74 @@ public class DiscoveryHandler extends AbstractCrudHandler
         catch (Exception e)
         {
             LOGGER.error("Invalid input in update(): " + e.getMessage());
-
-            handleInvalidData(ctx, INVALID_JSON_BODY);
         }
     }
 
     @Override
     public void delete(RoutingContext ctx)
     {
-        var id = validateIdFromPath(ctx);
+        try
+        {
+            var id = validateIdFromPath(ctx);
 
-        if (id == -1) return;
+            if (id == -1) return;
 
-        LOGGER.info("Deleting discovery profile ID: " + id);
+            LOGGER.info("Deleting discovery profile ID: " + id);
 
-        executeQuery(DELETE_DISCOVERY, List.of(id))
-                .onSuccess(result ->
-                {
-                    var rowCount = result.getInteger("rowCount", 0);
-
-                    if (rowCount == 0)
+            executeQuery(DELETE_DISCOVERY, List.of(id))
+                    .onSuccess(result ->
                     {
-                        handleNotFound(ctx);
-                    }
-                    else
-                    {
-                        LOGGER.info("Discovery profile deleted for ID: " + id);
+                        try
+                        {
+                            var rowCount = result.getInteger("rowCount", 0);
 
-                        handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
-                    }
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
+                            if (rowCount == 0)
+                            {
+                                handleNotFound(ctx,new JsonObject().put(ERROR, NOT_FOUND));
+                            }
+                            else
+                            {
+                                LOGGER.info("Discovery profile deleted for ID: " + id);
+
+                                handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing result: " + e.getMessage());
+                        }
+                    })
+                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while deleting discovery profile: " + e.getMessage());
+        }
+
     }
 
     public void runDiscovery(RoutingContext ctx)
     {
-        var id = validateIdFromPath(ctx);
+        try
+        {
+            var id = validateIdFromPath(ctx);
 
-        if (id == -1) return;
+            if (id == -1) return;
 
-        LOGGER.info("running discovery profile ID: " + id);
+            LOGGER.info("running discovery profile ID: " + id);
 
-        executeQuery(DATA_TO_PLUGIN_FOR_DISCOVERY, List.of(id))
-                .onSuccess(dbRes ->
-                {
-                    try
+            executeQuery(DATA_TO_PLUGIN_FOR_DISCOVERY, List.of(id))
+                    .onSuccess(dbRes ->
                     {
-                        var rows = dbRes.getJsonArray("rows", new JsonArray());
+                        try
+                        {
+                            var rows = dbRes.getJsonArray("rows", new JsonArray());
 
-                        if (rows.isEmpty())
-                        {
-                            handleNotFound(ctx);
-                        }
-                        else
-                        {
-                            try
+                            if (rows.isEmpty())
+                            {
+                                handleNotFound(ctx,new JsonObject().put(ERROR, NOT_FOUND));
+                            }
+                            else
                             {
                                 var row = rows.getJsonObject(0);
 
@@ -328,67 +382,72 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                                 .put(USERNAME, row.getString(USERNAME))
                                                 .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD))));
 
-                                ctx.vertx().eventBus().request(DiscoveryVerticle.SERVICE_ADDRESS, discoveryData,
-                                        ar ->
-                                        {
-                                            if (ar.failed())
-                                            {
-                                                LOGGER.error("Error during discovery process: " + ar.cause().getMessage());
+                                ctx.vertx().eventBus().send(DiscoveryVerticle.SERVICE_ADDRESS, discoveryData);
 
-                                                ctx.response()
-                                                        .setStatusCode(500)
-                                                        .end(new JsonObject().put(ERROR, PLUGIN_EXECUTION_FAILED).encode());
-                                            }
-                                            else
-                                            {
-                                                JsonObject response = (JsonObject) ar.result().body();
-
-                                                ctx.json(response);
-                                            }
-                                        });
-                            }
-                            catch (Exception e)
-                            {
-                                LOGGER.error(e.getMessage());
+                                handleSuccess(ctx,new JsonObject().put(MESSAGE,"Discovery run successfully started"));
                             }
                         }
-                    }
-                    catch (Exception e)
-                    {
-                        LOGGER.error("Failed to process device: " + e.getMessage());
-                    }
-                })
-                .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Failed to process device: " + e.getMessage());
+                        }
+                    })
+                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while running discovery: " + e.getMessage());
+        }
     }
 
     public static boolean isNotValidPort(int port)
     {
-        return !(port >= 1) || !(port <= 65535);
+        try
+        {
+            return !(port >= 1) || !(port <= 65535);
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Invalid port: " + e.getMessage());
+
+            return true;
+        }
+
     }
 
     private boolean notValidateDiscoveryFields(RoutingContext ctx, JsonObject body)
     {
-        if (body == null)
+        try
         {
-            handleMissingData(ctx, INVALID_JSON_BODY);
+            if (body == null)
+            {
+                handleMissingData(ctx, INVALID_JSON_BODY);
+
+                return true;
+            }
+
+            var name = body.getString(NAME);
+
+            var ip = body.getString(IP);
+
+            var credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
+
+            if (name == null || ip == null || credentialProfileId == 0)
+            {
+                handleMissingData(ctx, MISSING_FIELDS);
+
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while validating discovery fields: " + e.getMessage());
 
             return true;
         }
 
-        var name = body.getString(NAME);
-
-        var ip = body.getString(IP);
-
-        var credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
-
-        if (name == null || ip == null || credentialProfileId == 0)
-        {
-            handleMissingData(ctx, MISSING_FIELDS);
-
-            return true;
-        }
-
-        return false;
     }
 
 }
