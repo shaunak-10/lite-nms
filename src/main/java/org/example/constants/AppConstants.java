@@ -184,7 +184,7 @@ public class AppConstants
 
         public static final String INTERVAL_OPTION = "-i";
 
-        public static final String TIMEOUT_OPTION= "-W";
+        public static final String PING_TIMEOUT_OPTION = "-W";
 
         public static final String COUNT= "count";
 
@@ -197,15 +197,13 @@ public class AppConstants
 
     public static class PortConstants
     {
-        public static final String TIMEOUT_OPTION = "-w";
+        public static final String PORT_TIMEOUT_OPTION = "-w";
 
         public static final String NC_COMMAND = "nc";
 
         public static final String ZERO_IO = "-zv";
 
         public static final String PORT = "port";
-
-        public static final String TIMEOUT = "timeout";
     }
 
     public static class ConfigKeys

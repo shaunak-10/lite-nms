@@ -12,8 +12,8 @@ import org.example.services.db.DatabaseService;
 import org.example.services.db.DatabaseVerticle;
 import org.example.utils.PluginOperationsUtil;
 import org.example.utils.DecryptionUtil;
-import org.example.utils.PingUtil;
-import org.example.utils.PortUtil;
+import org.example.utils.ConnectivityUtil;
+import org.example.utils.ConnectivityUtil.CheckType;
 
 import java.util.List;
 
@@ -97,51 +97,69 @@ public class DiscoveryVerticle extends AbstractVerticle
     {
         try
         {
-            PingUtil.filterReachableDevices(vertx, devices)
-                    .onFailure(cause -> LOGGER.error("Ping check failed: " + cause.getMessage()))
-                    .onSuccess(pingedDevices ->
+            vertx.executeBlocking(() ->
                     {
-                        if (pingedDevices.isEmpty())
+                        var pingResults = ConnectivityUtil.filterReachableDevices(devices, CheckType.PING);
+
+                        if (pingResults.isEmpty())
                         {
-                            LOGGER.info("Device not reachable via ping. Marking as inactive.");
+                            return new JsonObject().put("reachable", false);
+                        }
+
+                        var portResults = ConnectivityUtil.filterReachableDevices(pingResults, CheckType.PORT);
+
+                        if (portResults.isEmpty())
+                        {
+                            return new JsonObject().put("reachable", false);
+                        }
+
+                        return new JsonObject()
+                                .put("reachable", true)
+                                .put("devices", portResults);
+                    })
+                    .onFailure(cause ->
+                    {
+                        LOGGER.error("Connectivity checks failed: " + cause.getMessage());
+
+                        updateDiscoveryStatus(defaultResults, message);
+                    })
+                    .onSuccess(result ->
+                    {
+                        if (!result.getBoolean("reachable"))
+                        {
+                            LOGGER.info("Device not reachable. Marking as inactive.");
 
                             updateDiscoveryStatus(defaultResults, message);
 
                             return;
                         }
 
-                        PortUtil.filterReachableDevices(vertx, pingedDevices)
-                                .onFailure(cause -> LOGGER.error("Port check failed: " + cause.getMessage()))
-                                .onSuccess(portFilteredDevices ->
+                        var portFilteredDevices = result.getJsonArray("devices");
+
+                        PluginOperationsUtil.runSSHReachability(portFilteredDevices)
+                                .onFailure(err ->
                                 {
-                                    if (portFilteredDevices.isEmpty())
-                                    {
-                                        LOGGER.info("All devices lost after port check. Marking all as inactive.");
+                                    LOGGER.error("SSH plugin call failed: " + err.getMessage());
 
-                                        updateDiscoveryStatus(defaultResults, message);
+                                    updateDiscoveryStatus(defaultResults, message);
+                                })
+                                .onSuccess(sshResults ->
+                                {
+                                    var deviceResult = defaultResults.getJsonObject(0);
 
-                                        return;
-                                    }
+                                    deviceResult.put("reachable", sshResults.getJsonObject(0).getBoolean("reachable"));
 
-                                    PluginOperationsUtil.runSSHReachability(portFilteredDevices)
-                                            .onFailure(err ->
-                                                    LOGGER.error("SSH plugin call failed: " + err.getMessage()))
-                                            .onSuccess(sshResults ->
-                                            {
-                                                var deviceResult = defaultResults.getJsonObject(0);
+                                    LOGGER.info("Discovery completed. Updating status for device ID: " + deviceResult.getInteger(ID));
 
-                                                deviceResult.put("reachable", sshResults.getJsonObject(0).getBoolean("reachable"));
-
-                                                LOGGER.info("Discovery completed. Updating status for device ID: " + deviceResult.getInteger(ID));
-
-                                                updateDiscoveryStatus(defaultResults, message);
-                                            });
+                                    updateDiscoveryStatus(defaultResults, message);
                                 });
                     });
         }
         catch (Exception e)
         {
             LOGGER.error("Failed to start run discovery: " + e.getMessage());
+
+            updateDiscoveryStatus(defaultResults, message);
         }
     }
 

@@ -8,9 +8,9 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import org.example.services.db.DatabaseService;
 import org.example.services.db.DatabaseVerticle;
+import org.example.utils.ConnectivityUtil;
 import org.example.utils.PluginOperationsUtil;
 import org.example.utils.DecryptionUtil;
-import org.example.utils.PingUtil;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,10 +21,10 @@ import static org.example.constants.AppConstants.ProvisionField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
 import static org.example.constants.AppConstants.ProvisionQuery.*;
+import static org.example.utils.ConnectivityUtil.CheckType;
 
 public class SchedulerServiceImpl implements SchedulerService
 {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(SchedulerServiceImpl.class);
 
     private final DatabaseService databaseService;
@@ -102,13 +102,13 @@ public class SchedulerServiceImpl implements SchedulerService
                                 return;
                             }
 
-                            PingUtil.filterReachableDevices(vertx, devices)
-                                    .onFailure(err -> LOGGER.error("Ping filtering failed: " + err.getMessage()))
-                                    .onSuccess(pingedDevices ->
+                            vertx.executeBlocking(() ->
                                     {
+                                        var pingResults = ConnectivityUtil.filterReachableDevices(devices, CheckType.PING);
+
                                         var availabilityParams = new ArrayList<>();
 
-                                        var reachableIds = pingedDevices.stream()
+                                        var reachableIds = pingResults.stream()
                                                 .map(dev -> ((JsonObject) dev).getInteger(ID))
                                                 .collect(Collectors.toSet());
 
@@ -119,20 +119,41 @@ public class SchedulerServiceImpl implements SchedulerService
                                             availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
                                         }
 
+                                        if (pingResults.isEmpty())
+                                        {
+                                            return new JsonObject()
+                                                    .put("availabilityParams", new JsonArray(availabilityParams))
+                                                    .put("reachableDevices", new JsonArray());
+                                        }
+
+                                        var portFilteredDevices = ConnectivityUtil.filterReachableDevices(pingResults, CheckType.PORT);
+
+                                        return new JsonObject()
+                                                .put("availabilityParams", new JsonArray(availabilityParams))
+                                                .put("reachableDevices", portFilteredDevices);
+                                    })
+                                    .onFailure(err -> LOGGER.error("Connectivity checks failed: " + err.getMessage()))
+                                    .onSuccess(result ->
+                                    {
+                                        var availabilityParams = result.getJsonArray("availabilityParams");
+
+                                        var reachableDevices = result.getJsonArray("reachableDevices");
+
                                         databaseService.executeBatch(new JsonObject()
                                                         .put("query", ADD_AVAILABILITY_DATA)
-                                                        .put("params", new JsonArray(availabilityParams)))
+                                                        .put("params", availabilityParams))
                                                 .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
+
                                                 .onFailure(err -> LOGGER.error("Availability insert failed: " + err.getMessage()));
 
-                                        if (pingedDevices.isEmpty())
+                                        if (reachableDevices.isEmpty())
                                         {
-                                            LOGGER.info("No devices reachable via ping. Skipping SSH polling.");
+                                            LOGGER.info("No devices reachable. Skipping SSH operations.");
 
                                             return;
                                         }
 
-                                        PluginOperationsUtil.runSSHMetrics(pingedDevices)
+                                        PluginOperationsUtil.runSSHMetrics(reachableDevices)
                                                 .onSuccess(metricsResults ->
                                                 {
                                                     LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
@@ -141,11 +162,11 @@ public class SchedulerServiceImpl implements SchedulerService
 
                                                     for (var i = 0; i < metricsResults.size(); i++)
                                                     {
-                                                        var result = metricsResults.getJsonObject(i);
+                                                        var metricResult = metricsResults.getJsonObject(i);
 
-                                                        var deviceId = result.getInteger("id");
+                                                        var deviceId = metricResult.getInteger("id");
 
-                                                        var metrics = result.copy();
+                                                        var metrics = metricResult.copy();
 
                                                         metrics.remove("id");
 
