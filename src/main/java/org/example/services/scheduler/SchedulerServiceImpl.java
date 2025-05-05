@@ -23,6 +23,14 @@ import static org.example.constants.AppConstants.CredentialField.PASSWORD;
 import static org.example.constants.AppConstants.ProvisionQuery.*;
 import static org.example.utils.ConnectivityUtil.CheckType;
 
+/**
+ * Implementation of {@link SchedulerService} that manages
+ * periodic polling of provisioned devices.
+ * This class handles retrieving devices from the database,
+ * running connectivity checks (ping and port), performing SSH
+ * metric collection using the plugin, and writing results back
+ * to the database.
+ */
 public class SchedulerServiceImpl implements SchedulerService
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(SchedulerServiceImpl.class);
@@ -33,18 +41,9 @@ public class SchedulerServiceImpl implements SchedulerService
 
     private final Vertx vertx;
 
-    /**
-     * Implementation of {@link SchedulerService} that manages
-     * periodic polling of provisioned devices.
-     * This class handles retrieving devices from the database,
-     * running connectivity checks (ping and port), performing SSH
-     * metric collection using the plugin, and writing results back
-     * to the database.
-     */
     public SchedulerServiceImpl(Vertx vertx)
     {
         this.databaseService = DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS);
-
         this.vertx = vertx;
     }
 
@@ -56,7 +55,6 @@ public class SchedulerServiceImpl implements SchedulerService
             if (pollingTimerId != -1)
             {
                 LOGGER.warn("Polling already running. Ignoring new start request.");
-
                 return Future.failedFuture("Polling already running");
             }
 
@@ -108,68 +106,107 @@ public class SchedulerServiceImpl implements SchedulerService
                                 return;
                             }
 
-                            vertx.executeBlocking(() ->
+                            // Process PING and PORT checks concurrently for each device
+                            var deviceFutures = devices.stream()
+                                    .map(obj -> (JsonObject) obj)
+                                    .map(device -> vertx.executeBlocking(
+                                            () ->
+                                            {
+                                                try
+                                                {
+                                                    // Perform PING check
+                                                    var pingResult = ConnectivityUtil.filterReachableDevices(new JsonArray().add(device), CheckType.PING);
+
+                                                    if (pingResult.isEmpty())
+                                                    {
+                                                        return null;
+                                                    }
+
+                                                    // Perform PORT check
+                                                    var portResult = ConnectivityUtil.filterReachableDevices(pingResult, CheckType.PORT);
+
+                                                    if (portResult.isEmpty())
+                                                    {
+                                                        return null;
+                                                    }
+
+                                                    // Return the device that passed both checks
+                                                    return portResult.getJsonObject(0);
+                                                }
+                                                catch (Exception e)
+                                                {
+                                                    LOGGER.error("Error processing device ID " + device.getInteger(ID) + ": " + e.getMessage());
+
+                                                    return null;
+                                                }
+                                            },
+                                            false // Ordered execution not required
+                                    ))
+                                    .collect(Collectors.toList());
+
+                            // Wait for all PING and PORT checks to complete
+                            Future.all(deviceFutures)
+                                    .compose(composite ->
                                     {
-                                        try
+                                        // Collect devices that passed PING and PORT checks
+                                        var reachableDevices = new JsonArray();
+
+                                        for (var i = 0; i < composite.size(); i++)
                                         {
-                                            // PING check
-                                            var pingResults = ConnectivityUtil.filterReachableDevices(devices, CheckType.PING);
+                                            var result = composite.resultAt(i);
 
-                                            if (pingResults.isEmpty())
+                                            if (result instanceof JsonObject)
                                             {
-                                                LOGGER.info("No devices responded to ping. Skipping further checks.");
-
-                                                // Create availability params for unreachable devices
-                                                return getEntries(devices);
+                                                reachableDevices.add(result);
                                             }
+                                        }
 
-                                            // PORT check
-                                            var portResults = ConnectivityUtil.filterReachableDevices(pingResults, CheckType.PORT);
+                                        // Prepare availability params
+                                        var availabilityParams = new ArrayList<>();
 
-                                            if (portResults.isEmpty())
-                                            {
-                                                LOGGER.info("No devices have open ports. Skipping SSH metrics.");
+                                        var reachableIds = reachableDevices.stream()
+                                                .map(dev -> ((JsonObject) dev).getInteger(ID))
+                                                .collect(Collectors.toSet());
 
-                                                return getEntries(devices);
-                                            }
+                                        for (var i = 0; i < devices.size(); i++)
+                                        {
+                                            var deviceId = devices.getJsonObject(i).getInteger(ID);
 
-                                            var availabilityParams = new ArrayList<>();
+                                            availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
+                                        }
 
-                                            var reachableIds = portResults.stream()
-                                                    .map(dev -> ((JsonObject) dev).getInteger(ID))
-                                                    .collect(Collectors.toSet());
+                                        if (reachableDevices.isEmpty())
+                                        {
+                                            LOGGER.info("No devices passed PING and PORT checks.");
 
-                                            for (var i = 0; i < devices.size(); i++)
-                                            {
-                                                var deviceId = devices.getJsonObject(i).getInteger(ID);
-
-                                                availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
-                                            }
-
-                                            // SSH metrics - now returns directly instead of Future
-                                            var metricsResults = PluginOperationsUtil.runSSHMetrics(portResults);
-
-                                            if (metricsResults.isEmpty())
-                                            {
-                                                LOGGER.info("SSH metrics collection returned no results.");
-                                            }
-
-                                            return new JsonObject()
+                                            return Future.succeededFuture(new JsonObject()
                                                     .put("availabilityParams", new JsonArray(availabilityParams))
-                                                    .put("metricsResults", metricsResults);
+                                                    .put("metricsResults", new JsonArray()));
                                         }
-                                        catch (Exception e)
-                                        {
-                                            LOGGER.error("Connectivity or SSH checks failed: " + e.getMessage());
 
-                                            // Return empty results on error
-                                            return getEntries(devices);
-                                        }
+                                        // Perform SSH metrics collection in executeBlocking
+                                        return vertx.executeBlocking(
+                                                () -> {
+                                                    try
+                                                    {
+                                                        return PluginOperationsUtil.runSSHMetrics(reachableDevices);
+                                                    }
+                                                    catch (Exception e)
+                                                    {
+                                                        LOGGER.error("SSH metrics collection failed: " + e.getMessage());
+
+                                                        return new JsonArray();
+                                                    }
+                                                },
+                                                false
+                                        ).map(metricsResults -> new JsonObject()
+                                                .put("availabilityParams", new JsonArray(availabilityParams))
+                                                .put("metricsResults", metricsResults));
                                     })
-                                    .onFailure(err -> LOGGER.error("Connectivity checks failed: " + err.getMessage()))
                                     .onSuccess(result ->
                                     {
                                         var availabilityParams = result.getJsonArray("availabilityParams");
+
                                         var metricsResults = result.getJsonArray("metricsResults");
 
                                         // Update availability data in database
@@ -182,6 +219,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                         if (metricsResults.isEmpty())
                                         {
                                             LOGGER.info("No metrics results to process.");
+
                                             return;
                                         }
 
@@ -195,9 +233,13 @@ public class SchedulerServiceImpl implements SchedulerService
                                             for (var i = 0; i < metricsResults.size(); i++)
                                             {
                                                 var metricResult = metricsResults.getJsonObject(i);
+
                                                 var deviceId = metricResult.getInteger("id");
+
                                                 var metrics = metricResult.copy();
+
                                                 metrics.remove("id");
+
                                                 batchParams.add(List.of(deviceId, metrics.encode()));
                                             }
 
@@ -221,6 +263,19 @@ public class SchedulerServiceImpl implements SchedulerService
                                         {
                                             LOGGER.error("Failed to process metrics results: " + e.getMessage());
                                         }
+                                    })
+                                    .onFailure(err ->
+                                    {
+                                        LOGGER.error("Polling pipeline failed: " + err.getMessage());
+
+                                        // Update availability as false for all devices on failure
+                                        var availabilityParams = getEntries(devices).getJsonArray("availabilityParams");
+
+                                        databaseService.executeBatch(new JsonObject()
+                                                        .put("query", ADD_AVAILABILITY_DATA)
+                                                        .put("params", availabilityParams))
+                                                .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
+                                                .onFailure(e -> LOGGER.error("Availability insert failed: " + e.getMessage()));
                                     });
                         })
                         .onFailure(err -> LOGGER.error("DB query failed: " + err.getMessage()));
@@ -232,7 +287,7 @@ public class SchedulerServiceImpl implements SchedulerService
         }
         catch (Exception e)
         {
-            LOGGER.error("Failed to start polling: " +  e.getMessage());
+            LOGGER.error("Failed to start polling: " + e.getMessage());
 
             return Future.failedFuture("Failed to start polling: " + e.getMessage());
         }
@@ -248,7 +303,6 @@ public class SchedulerServiceImpl implements SchedulerService
 
             availabilityParams.add(List.of(deviceId, false));
         }
-
         return new JsonObject()
                 .put("availabilityParams", new JsonArray(availabilityParams))
                 .put("metricsResults", new JsonArray());

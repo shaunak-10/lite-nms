@@ -2,6 +2,7 @@ package org.example;
 
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.core.VertxOptions;
 import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;
 import org.example.services.db.DatabaseClient;
@@ -17,7 +18,9 @@ import static org.example.constants.AppConstants.AddressesAndPaths.CONFIG_FILE_P
 
 public class MainApp
 {
-    private static Vertx vertx = Vertx.vertx();
+    private static final int VERTX_WORKER_POOL_SIZE = 30;
+
+    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(VERTX_WORKER_POOL_SIZE));
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MainApp.class);
 
@@ -63,7 +66,7 @@ public class MainApp
 
                             LOGGER.info("📦 Tables created or already exist.");
 
-                            deployAllVerticles(vertx)
+                            deployAllVerticles()
                                     .onSuccess(v -> LOGGER.info("🚀 All verticles deployed successfully!"))
                                     .onFailure(err -> {
                                         LOGGER.error("❌ Failed to deploy verticles: " + err.getMessage());
@@ -92,7 +95,7 @@ public class MainApp
         }
     }
 
-    private static Future<Object> deployAllVerticles(Vertx vertx)
+    private static Future<Object> deployAllVerticles()
     {
         var verticles = List.of(
                 DatabaseVerticle.class,
@@ -106,7 +109,7 @@ public class MainApp
         for (var verticle : verticles)
         {
             chain = chain.compose(ignored ->
-                    vertx.deployVerticle(verticle.getName())
+                    MainApp.vertx.deployVerticle(verticle.getName())
                             .onSuccess(id ->
                                     LOGGER.info("✅ Deployed: " + verticle.getSimpleName()))
                             .mapEmpty()
