@@ -268,6 +268,15 @@ public class CredentialHandler extends AbstractCrudHandler
         }
     }
 
+    /**
+     * Validates the credential fields in the request body.
+     * Checks if the body is present and contains the necessary fields: name, username, and password.
+     * If any of the fields are missing or the body is null, an error response is sent to the client.
+     *
+     * @param ctx the RoutingContext containing the request data
+     * @param body the JSON object containing the fields to validate
+     * @return true if validation fails (either due to missing data or invalid fields), false otherwise
+     */
     private boolean notValidateCredentialFields(RoutingContext ctx, JsonObject body)
     {
         try

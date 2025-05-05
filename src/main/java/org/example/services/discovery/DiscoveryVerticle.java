@@ -22,6 +22,13 @@ import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
 
+/**
+ * Verticle responsible for running discovery operations.
+ * <p>
+ * Handles device reachability checks (ping, port, SSH) and updates
+ * discovery status in the database. Communicates over the event bus
+ * at {@code discovery.service}.
+ */
 public class DiscoveryVerticle extends AbstractVerticle
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(DiscoveryVerticle.class);
@@ -45,6 +52,12 @@ public class DiscoveryVerticle extends AbstractVerticle
         }
     }
 
+    /**
+     * Handles incoming discovery-related requests from the Event Bus.
+     * Supports actions like "startDiscovery" and "fetchDeviceDetailsAndRunDiscovery".
+     *
+     * @param message the message containing the action and payload.
+     */
     private void handleDiscoveryRequests(Message<JsonObject> message)
     {
         try
@@ -68,7 +81,7 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                     startDiscoveryPipeline(new JsonArray().add(device), new JsonArray().add(new JsonObject()
                             .put(ID, device.getInteger(ID))
-                            .put("reachable", false)), message);
+                            .put("reachable", false)));
 
                     break;
 
@@ -77,8 +90,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                     fetchDeviceDetailsAndRunDiscovery(request.getInteger("discoveryId"),
                             request.getString("ip"),
                             request.getInteger("port"),
-                            request.getInteger("credentialProfileId"),
-                            message);
+                            request.getInteger("credentialProfileId"));
 
                     break;
 
@@ -90,80 +102,110 @@ public class DiscoveryVerticle extends AbstractVerticle
         {
             LOGGER.error("Failed to handle discovery requests: " + e.getMessage());
         }
-        
+
     }
 
-    private void startDiscoveryPipeline(JsonArray devices, JsonArray defaultResults, Message<JsonObject> message)
+    /**
+     * Executes the discovery pipeline for a given list of devices:
+     * 1. PING check
+     * 2. PORT check
+     * 3. SSH reachability check via external plugin
+     * Updates the database with the final reachability status.
+     *
+     * @param devices         a JsonArray of device details including IP, port, and credentials.
+     * @param defaultResults  a JsonArray containing initial reachability status (usually false).
+     */
+    private void startDiscoveryPipeline(JsonArray devices, JsonArray defaultResults)
     {
         try
         {
             vertx.executeBlocking(() ->
                     {
-                        var pingResults = ConnectivityUtil.filterReachableDevices(devices, CheckType.PING);
-
-                        if (pingResults.isEmpty())
+                        try
                         {
+                            var pingResults = ConnectivityUtil.filterReachableDevices(devices, CheckType.PING);
+
+                            if (pingResults.isEmpty())
+                            {
+                                return new JsonObject().put("reachable", false);
+                            }
+
+                            var portResults = ConnectivityUtil.filterReachableDevices(pingResults, CheckType.PORT);
+
+                            if (portResults.isEmpty())
+                            {
+                                return new JsonObject().put("reachable", false);
+                            }
+
+                            var sshResults = PluginOperationsUtil.runSSHReachability(portResults);
+
+                            if (sshResults.isEmpty())
+                            {
+                                return new JsonObject().put("reachable", false);
+                            }
+
+                            var sshReachable = sshResults.getJsonObject(0).getBoolean("reachable");
+
+                            return new JsonObject()
+                                    .put("reachable", sshReachable)
+                                    .put("sshResults", sshResults);
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("SSH reachability check failed: " + e.getMessage());
+
                             return new JsonObject().put("reachable", false);
                         }
-
-                        var portResults = ConnectivityUtil.filterReachableDevices(pingResults, CheckType.PORT);
-
-                        if (portResults.isEmpty())
-                        {
-                            return new JsonObject().put("reachable", false);
-                        }
-
-                        return new JsonObject()
-                                .put("reachable", true)
-                                .put("devices", portResults);
                     })
                     .onFailure(cause ->
                     {
                         LOGGER.error("Connectivity checks failed: " + cause.getMessage());
 
-                        updateDiscoveryStatus(defaultResults, message);
+                        updateDiscoveryStatus(defaultResults);
                     })
                     .onSuccess(result ->
                     {
-                        if (!result.getBoolean("reachable"))
+                        try
                         {
-                            LOGGER.info("Device not reachable. Marking as inactive.");
+                            if (!result.getBoolean("reachable"))
+                            {
+                                LOGGER.info("Device not reachable. Marking as inactive.");
 
-                            updateDiscoveryStatus(defaultResults, message);
+                                updateDiscoveryStatus(defaultResults);
 
-                            return;
+                                return;
+                            }
+
+                            var deviceResult = defaultResults.getJsonObject(0);
+
+                            deviceResult.put("reachable", result.getJsonArray("sshResults").getJsonObject(0).getBoolean("reachable"));
+
+                            LOGGER.info("Discovery completed. Updating status for device ID: " + deviceResult.getInteger(ID));
+
+                            updateDiscoveryStatus(defaultResults);
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing discovery results: " + e.getMessage());
                         }
 
-                        var portFilteredDevices = result.getJsonArray("devices");
-
-                        PluginOperationsUtil.runSSHReachability(portFilteredDevices)
-                                .onFailure(err ->
-                                {
-                                    LOGGER.error("SSH plugin call failed: " + err.getMessage());
-
-                                    updateDiscoveryStatus(defaultResults, message);
-                                })
-                                .onSuccess(sshResults ->
-                                {
-                                    var deviceResult = defaultResults.getJsonObject(0);
-
-                                    deviceResult.put("reachable", sshResults.getJsonObject(0).getBoolean("reachable"));
-
-                                    LOGGER.info("Discovery completed. Updating status for device ID: " + deviceResult.getInteger(ID));
-
-                                    updateDiscoveryStatus(defaultResults, message);
-                                });
                     });
         }
         catch (Exception e)
         {
             LOGGER.error("Failed to start run discovery: " + e.getMessage());
 
-            updateDiscoveryStatus(defaultResults, message);
+            updateDiscoveryStatus(defaultResults);
         }
     }
 
-    private void updateDiscoveryStatus(JsonArray defaultResults, Message<JsonObject> message)
+    /**
+     * Updates the discovery_profile status in the database based on SSH reachability results.
+     * Sets the status to ACTIVE or INACTIVE accordingly.
+     *
+     * @param defaultResults  a JsonArray containing the device ID and its reachability result.
+     */
+    private void updateDiscoveryStatus(JsonArray defaultResults)
     {
         try
         {
@@ -180,13 +222,9 @@ public class DiscoveryVerticle extends AbstractVerticle
 
             executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean("reachable") ? ACTIVE : INACTIVE, id))
                     .onSuccess(res ->
-                    {
-                        LOGGER.info("Discovery status updated for device ID: " + id);
-                    })
+                            LOGGER.info("Discovery status updated for device ID: " + id))
                     .onFailure(err ->
-                    {
-                        LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage());
-                    });
+                            LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage()));
         }
         catch (Exception e)
         {
@@ -195,7 +233,17 @@ public class DiscoveryVerticle extends AbstractVerticle
 
     }
 
-    private void fetchDeviceDetailsAndRunDiscovery(int id, String ip, int port, int credentialProfileId, Message<JsonObject> message)
+    /**
+     * Fetches credential details for a specific credential profile ID,
+     * constructs a full device JSON object (with decrypted password),
+     * and initiates the discovery pipeline for that device.
+     *
+     * @param id                   the ID of the discovery profile/device.
+     * @param ip                   the IP address of the device.
+     * @param port                 the port number to check connectivity.
+     * @param credentialProfileId  the associated credential_profile ID.
+     */
+    private void fetchDeviceDetailsAndRunDiscovery(int id, String ip, int port, int credentialProfileId)
     {
         try
         {
@@ -229,7 +277,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                             startDiscoveryPipeline(new JsonArray().add(device),
                                     new JsonArray().add(new JsonObject()
                                             .put(ID, id)
-                                            .put("reachable", false)), message);
+                                            .put("reachable", false)));
                         }
                         catch (Exception e)
                         {
@@ -246,6 +294,14 @@ public class DiscoveryVerticle extends AbstractVerticle
 
     }
 
+    /**
+     * Sends a SQL query along with optional parameters to the DatabaseVerticle
+     * using a Vert.x service proxy and returns a Future of the result.
+     *
+     * @param query   the SQL query to execute.
+     * @param params  the list of query parameters (can be null or empty).
+     * @return        a Future containing the query result as a JsonObject.
+     */
     Future<JsonObject> executeQuery(String query, List<Object> params)
     {
         var request = new JsonObject()

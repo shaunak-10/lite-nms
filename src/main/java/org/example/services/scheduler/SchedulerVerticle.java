@@ -7,6 +7,9 @@ import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.serviceproxy.ServiceBinder;
 import org.example.utils.ConfigLoader;
 
+/**
+ * Verticle responsible for scheduling periodic polling tasks.
+ */
 public class SchedulerVerticle extends AbstractVerticle
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(SchedulerVerticle.class);

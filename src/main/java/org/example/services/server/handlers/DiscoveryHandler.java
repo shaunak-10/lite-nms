@@ -225,6 +225,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
     }
 
+    @Override
     public void update(RoutingContext ctx)
     {
         try
@@ -347,6 +348,15 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
     }
 
+    /**
+     * Runs the discovery process for a given discovery profile ID.
+     *
+     * This method validates the discovery profile ID from the URL path, fetches the relevant data from the database,
+     * and then sends the data to the DiscoveryVerticle for processing. If the profile data is not found or there is an error,
+     * it sends an appropriate response to the client.
+     *
+     * @param ctx the RoutingContext containing the request data
+     */
     public void runDiscovery(RoutingContext ctx)
     {
         try
@@ -400,6 +410,12 @@ public class DiscoveryHandler extends AbstractCrudHandler
         }
     }
 
+    /**
+     * Validates if the provided port number is within the valid range (1-65535).
+     *
+     * @param port the port number to validate
+     * @return true if the port is invalid (not in the valid range), false otherwise
+     */
     public static boolean isNotValidPort(int port)
     {
         try
@@ -415,6 +431,16 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
     }
 
+    /**
+     * Validates the required fields for the discovery profile in the request body.
+     *
+     * Checks if the body is present and contains the necessary fields: name, IP, and credentialProfileId.
+     * If any of the fields are missing, an error response is sent to the client.
+     *
+     * @param ctx the RoutingContext containing the request data
+     * @param body the JSON object containing the fields to validate
+     * @return true if validation fails (due to missing data or invalid fields), false otherwise
+     */
     private boolean notValidateDiscoveryFields(RoutingContext ctx, JsonObject body)
     {
         try

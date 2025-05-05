@@ -12,6 +12,11 @@ import io.vertx.sqlclient.SqlClient;
 import io.vertx.pgclient.PgBuilder;
 
 
+/**
+ * Utility class to manage the PostgreSQL database client using Vert.x.
+ * Provides methods to get a shared client, test the connection, and
+ * create necessary tables on application startup.
+ */
 public class DatabaseClient
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseClient.class);
@@ -20,6 +25,12 @@ public class DatabaseClient
 
     private static SqlClient client;
 
+    /**
+     * Retrieves the singleton instance of {@link SqlClient}.
+     * Initializes the client if not already created, using environment variables for configuration.
+     *
+     * @return The initialized {@link SqlClient} instance for executing queries.
+     */
     public static SqlClient getClient()
     {
         if (client == null)
@@ -47,6 +58,12 @@ public class DatabaseClient
         return client;
     }
 
+    /**
+     * Tests the database connection by executing a simple `SELECT 1` query.
+     * Useful for validating connectivity at startup or during health checks.
+     *
+     * @param resultHandler A handler to process the result: succeeded if connection is OK, failed otherwise.
+     */
     public static void testConnection(Handler<AsyncResult<Void>> resultHandler)
     {
         try
@@ -74,6 +91,13 @@ public class DatabaseClient
         }
     }
 
+    /**
+     * Creates all necessary database tables if they do not already exist.
+     * This includes tables for credential profiles, discovery profiles,
+     * provisioned devices, polling results, and availability checks.
+     *
+     * @param resultHandler A handler to process the result once all table creation queries are executed.
+     */
     public static void createTablesIfNotExist(Handler<AsyncResult<Void>> resultHandler)
     {
         try

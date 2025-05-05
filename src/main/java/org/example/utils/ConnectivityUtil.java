@@ -1,6 +1,9 @@
 package org.example.utils;
 
+import io.vertx.core.impl.logging.Logger;
+import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
+import org.example.services.scheduler.SchedulerVerticle;
 
 import java.util.Arrays;
 import java.util.List;
@@ -14,7 +17,11 @@ import static org.example.constants.AppConstants.PortConstants.*;
 
 public class ConnectivityUtil
 {
-    public enum CheckType {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConnectivityUtil.class);
+
+    public enum CheckType
+    {
         PING,
         PORT
     }
@@ -32,59 +39,67 @@ public class ConnectivityUtil
 
         for (var i = 0; i < devices.size(); i++)
         {
-            var device = devices.getJsonObject(i);
-
-            List<String> command;
-
-            if (checkType == CheckType.PING)
-            {
-                var pingConfig = ConfigLoader.get().getJsonObject(PING_COMMAND);
-
-                command = Arrays.asList(
-                        PING_COMMAND,
-                        PACKETS_OPTION, String.valueOf(pingConfig.getInteger(COUNT)),
-                        PING_TIMEOUT_OPTION, String.valueOf(pingConfig.getInteger(TIMEOUT)),
-                        INTERVAL_OPTION, String.valueOf(pingConfig.getDouble(INTERVAL)),
-                        device.getString(IP)
-                );
-            }
-            else
-            { // PORT check
-                var portConfig = ConfigLoader.get().getJsonObject(PORT);
-
-                command = Arrays.asList(
-                        NC_COMMAND, ZERO_IO, PORT_TIMEOUT_OPTION, String.valueOf(portConfig.getInteger(TIMEOUT)),
-                        device.getString(IP),
-                        String.valueOf(device.getInteger(PORT, 22))
-                );
-            }
-
-            Process process = null;
             try
             {
-                process = new ProcessBuilder(command).start();
+                var device = devices.getJsonObject(i);
 
-                // Get timeout from config
-                var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
+                List<String> command;
 
-                var exitCode = process.waitFor(timeout, TimeUnit.SECONDS) ? process.exitValue() : -1;
-
-                if (exitCode == 0)
+                if (checkType == CheckType.PING)
                 {
-                    reachableDevices.add(device);
+                    var pingConfig = ConfigLoader.get().getJsonObject(PING_COMMAND);
+
+                    command = Arrays.asList(
+                            PING_COMMAND,
+                            PACKETS_OPTION, String.valueOf(pingConfig.getInteger(COUNT)),
+                            PING_TIMEOUT_OPTION, String.valueOf(pingConfig.getInteger(TIMEOUT)),
+                            INTERVAL_OPTION, String.valueOf(pingConfig.getDouble(INTERVAL)),
+                            device.getString(IP)
+                    );
+                }
+                else
+                {
+                    var portConfig = ConfigLoader.get().getJsonObject(PORT);
+
+                    command = Arrays.asList(
+                            NC_COMMAND, ZERO_IO, PORT_TIMEOUT_OPTION, String.valueOf(portConfig.getInteger(TIMEOUT)),
+                            device.getString(IP),
+                            String.valueOf(device.getInteger(PORT, 22))
+                    );
+                }
+
+                Process process = null;
+
+                try
+                {
+                    process = new ProcessBuilder(command).start();
+
+                    // Get timeout from config
+                    var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
+
+                    var exitCode = process.waitFor(timeout, TimeUnit.SECONDS) ? process.exitValue() : -1;
+
+                    if (exitCode == 0)
+                    {
+                        reachableDevices.add(device);
+                    }
+                }
+                catch (Exception e)
+                {
+                    // Log error or handle exception if needed
+                    System.err.println("Error checking connectivity: " + e.getMessage());
+                }
+                finally
+                {
+                    if (process != null)
+                    {
+                        process.destroy();
+                    }
                 }
             }
             catch (Exception e)
             {
-                // Log error or handle exception if needed
-                System.err.println("Error checking connectivity: " + e.getMessage());
-            }
-            finally
-            {
-                if (process != null)
-                {
-                    process.destroy();
-                }
+                LOGGER.error(e.getMessage());
             }
         }
 

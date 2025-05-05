@@ -33,6 +33,14 @@ public class SchedulerServiceImpl implements SchedulerService
 
     private final Vertx vertx;
 
+    /**
+     * Implementation of {@link SchedulerService} that manages
+     * periodic polling of provisioned devices.
+     * This class handles retrieving devices from the database,
+     * running connectivity checks (ping and port), performing SSH
+     * metric collection using the plugin, and writing results back
+     * to the database.
+     */
     public SchedulerServiceImpl(Vertx vertx)
     {
         this.databaseService = DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS);
@@ -72,9 +80,7 @@ public class SchedulerServiceImpl implements SchedulerService
 
                             var devices = new JsonArray();
 
-                            var rows = dbResponse.getJsonArray("rows", new JsonArray());
-
-                            for (var rowObj : rows)
+                            for (var rowObj : dbResponse.getJsonArray("rows", new JsonArray()))
                             {
                                 var row = (JsonObject) rowObj;
 
@@ -104,92 +110,117 @@ public class SchedulerServiceImpl implements SchedulerService
 
                             vertx.executeBlocking(() ->
                                     {
-                                        var pingResults = ConnectivityUtil.filterReachableDevices(devices, CheckType.PING);
-
-                                        var availabilityParams = new ArrayList<>();
-
-                                        var reachableIds = pingResults.stream()
-                                                .map(dev -> ((JsonObject) dev).getInteger(ID))
-                                                .collect(Collectors.toSet());
-
-                                        for (var i = 0; i < devices.size(); i++)
+                                        try
                                         {
-                                            var deviceId = devices.getJsonObject(i).getInteger(ID);
+                                            // PING check
+                                            var pingResults = ConnectivityUtil.filterReachableDevices(devices, CheckType.PING);
 
-                                            availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
-                                        }
+                                            if (pingResults.isEmpty())
+                                            {
+                                                LOGGER.info("No devices responded to ping. Skipping further checks.");
 
-                                        if (pingResults.isEmpty())
-                                        {
+                                                // Create availability params for unreachable devices
+                                                return getEntries(devices);
+                                            }
+
+                                            // PORT check
+                                            var portResults = ConnectivityUtil.filterReachableDevices(pingResults, CheckType.PORT);
+
+                                            if (portResults.isEmpty())
+                                            {
+                                                LOGGER.info("No devices have open ports. Skipping SSH metrics.");
+
+                                                return getEntries(devices);
+                                            }
+
+                                            var availabilityParams = new ArrayList<>();
+
+                                            var reachableIds = portResults.stream()
+                                                    .map(dev -> ((JsonObject) dev).getInteger(ID))
+                                                    .collect(Collectors.toSet());
+
+                                            for (var i = 0; i < devices.size(); i++)
+                                            {
+                                                var deviceId = devices.getJsonObject(i).getInteger(ID);
+
+                                                availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
+                                            }
+
+                                            // SSH metrics - now returns directly instead of Future
+                                            var metricsResults = PluginOperationsUtil.runSSHMetrics(portResults);
+
+                                            if (metricsResults.isEmpty())
+                                            {
+                                                LOGGER.info("SSH metrics collection returned no results.");
+                                            }
+
                                             return new JsonObject()
                                                     .put("availabilityParams", new JsonArray(availabilityParams))
-                                                    .put("reachableDevices", new JsonArray());
+                                                    .put("metricsResults", metricsResults);
                                         }
+                                        catch (Exception e)
+                                        {
+                                            LOGGER.error("Connectivity or SSH checks failed: " + e.getMessage());
 
-                                        var portFilteredDevices = ConnectivityUtil.filterReachableDevices(pingResults, CheckType.PORT);
-
-                                        return new JsonObject()
-                                                .put("availabilityParams", new JsonArray(availabilityParams))
-                                                .put("reachableDevices", portFilteredDevices);
+                                            // Return empty results on error
+                                            return getEntries(devices);
+                                        }
                                     })
                                     .onFailure(err -> LOGGER.error("Connectivity checks failed: " + err.getMessage()))
                                     .onSuccess(result ->
                                     {
                                         var availabilityParams = result.getJsonArray("availabilityParams");
+                                        var metricsResults = result.getJsonArray("metricsResults");
 
-                                        var reachableDevices = result.getJsonArray("reachableDevices");
-
+                                        // Update availability data in database
                                         databaseService.executeBatch(new JsonObject()
                                                         .put("query", ADD_AVAILABILITY_DATA)
                                                         .put("params", availabilityParams))
                                                 .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
-
                                                 .onFailure(err -> LOGGER.error("Availability insert failed: " + err.getMessage()));
 
-                                        if (reachableDevices.isEmpty())
+                                        if (metricsResults.isEmpty())
                                         {
-                                            LOGGER.info("No devices reachable. Skipping SSH operations.");
-
+                                            LOGGER.info("No metrics results to process.");
                                             return;
                                         }
 
-                                        PluginOperationsUtil.runSSHMetrics(reachableDevices)
-                                                .onSuccess(metricsResults ->
-                                                {
-                                                    LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
+                                        // Process and insert metrics results
+                                        try
+                                        {
+                                            LOGGER.info("Polling completed. Received " + metricsResults.size() + " results.");
 
-                                                    var batchParams = new ArrayList<>();
+                                            var batchParams = new ArrayList<>();
 
-                                                    for (var i = 0; i < metricsResults.size(); i++)
+                                            for (var i = 0; i < metricsResults.size(); i++)
+                                            {
+                                                var metricResult = metricsResults.getJsonObject(i);
+                                                var deviceId = metricResult.getInteger("id");
+                                                var metrics = metricResult.copy();
+                                                metrics.remove("id");
+                                                batchParams.add(List.of(deviceId, metrics.encode()));
+                                            }
+
+                                            databaseService.executeBatch(new JsonObject()
+                                                            .put("query", INSERT_POLLING_RESULT)
+                                                            .put("params", new JsonArray(batchParams)))
+                                                    .onSuccess(batchResponse ->
                                                     {
-                                                        var metricResult = metricsResults.getJsonObject(i);
-
-                                                        var deviceId = metricResult.getInteger("id");
-
-                                                        var metrics = metricResult.copy();
-
-                                                        metrics.remove("id");
-
-                                                        batchParams.add(List.of(deviceId, metrics.encode()));
-                                                    }
-
-                                                    databaseService.executeBatch(new JsonObject()
-                                                                    .put("query", INSERT_POLLING_RESULT)
-                                                                    .put("params", new JsonArray(batchParams)))
-                                                            .onSuccess(batchResponse ->
-                                                            {
-                                                                if (batchResponse.getBoolean("success"))
-                                                                {
-                                                                    LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
-                                                                }
-                                                                else
-                                                                {
-                                                                    LOGGER.warn("Batch insert failed: " + batchResponse.getString("error"));
-                                                                }
-                                                            })
-                                                            .onFailure(err -> LOGGER.error("Batch insert failed: " + err.getMessage()));
-                                                })
-                                                .onFailure(err -> LOGGER.error("Plugin polling failed: " + err.getMessage()));
+                                                        if (batchResponse.getBoolean("success"))
+                                                        {
+                                                            LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
+                                                        }
+                                                        else
+                                                        {
+                                                            LOGGER.warn("Batch insert failed: " + batchResponse.getString("error"));
+                                                        }
+                                                    })
+                                                    .onFailure(err -> LOGGER.error("Batch insert failed: " + err.getMessage()));
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            LOGGER.error("Failed to process metrics results: " + e.getMessage());
+                                        }
                                     });
                         })
                         .onFailure(err -> LOGGER.error("DB query failed: " + err.getMessage()));
@@ -205,5 +236,21 @@ public class SchedulerServiceImpl implements SchedulerService
 
             return Future.failedFuture("Failed to start polling: " + e.getMessage());
         }
+    }
+
+    private JsonObject getEntries(JsonArray devices)
+    {
+        var availabilityParams = new ArrayList<>();
+
+        for (var i = 0; i < devices.size(); i++)
+        {
+            var deviceId = devices.getJsonObject(i).getInteger(ID);
+
+            availabilityParams.add(List.of(deviceId, false));
+        }
+
+        return new JsonObject()
+                .put("availabilityParams", new JsonArray(availabilityParams))
+                .put("metricsResults", new JsonArray());
     }
 }

@@ -19,6 +19,20 @@ import io.vertx.ext.web.handler.BodyHandler;
 
 import static org.example.constants.AppConstants.Headers.*;
 
+/**
+ * Verticle responsible for initializing and starting the HTTP server.
+ *
+ * This server supports:
+ * <ul>
+ *     <li>Login and token-based authentication using JWT.</li>
+ *     <li>Protected REST endpoints for credentials, discovery, and provision resources.</li>
+ *     <li>Support for access and refresh tokens with secure cookie handling.</li>
+ * </ul>
+ *
+ * Routes are protected with {@link JWTAuthHandler}, and the server uses a keystore
+ * for signing JWTs. All route handlers are initialized through corresponding route
+ * classes like {@link CredentialRoutes}, {@link DiscoveryRoutes}, and {@link ProvisionRoutes}.
+ */
 public class HttpServerVerticle extends AbstractVerticle
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(HttpServerVerticle.class);

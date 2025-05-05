@@ -17,23 +17,58 @@ import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
 import static org.example.constants.AppConstants.Headers.*;
 
+/**
+ * Abstract base class for handling CRUD operations in a REST API.
+ * Provides utility methods for handling common request and response operations
+ */
 public abstract class AbstractCrudHandler
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(AbstractCrudHandler.class);
 
     DatabaseService databaseService = DatabaseService.createProxy(MainApp.getVertx(), DatabaseVerticle.SERVICE_ADDRESS);
 
+    /**
+     * Handles adding a new resource.
+     *
+     * @param ctx the routing context
+     */
     public abstract void add(RoutingContext ctx);
 
+    /**
+     * Handles retrieving a list of all resources.
+     *
+     * @param ctx the routing context
+     */
     public abstract void list(RoutingContext ctx);
 
+    /**
+     * Handles retrieving a resource by its ID.
+     *
+     * @param ctx the routing context
+     */
     public abstract void getById(RoutingContext ctx);
 
+    /**
+     * Handles updating a resource by its ID.
+     *
+     * @param ctx the routing context
+     */
     public abstract void update(RoutingContext ctx);
 
+    /**
+     * Handles deleting a resource by its ID.
+     *
+     * @param ctx the routing context
+     */
     public abstract void delete(RoutingContext ctx);
 
 
+    /**
+     * Validates and parses the ID from the path parameters.
+     *
+     * @param ctx the RoutingContext containing the request data
+     * @return the parsed ID, or -1 if the ID is invalid
+     */
     protected int validateIdFromPath(RoutingContext ctx)
     {
         var idParam = ctx.pathParam("id");
@@ -103,6 +138,13 @@ public abstract class AbstractCrudHandler
         sendJsonResponse(ctx, 405, new JsonObject().put(ERROR, message));
     }
 
+    /**
+     * Sends a JSON response to the client with the specified status code and body.
+     *
+     * @param ctx the RoutingContext containing the request data
+     * @param statusCode the HTTP status code to send
+     * @param body the JSON body to send in the response
+     */
     protected void sendJsonResponse(RoutingContext ctx, int statusCode, JsonObject body)
     {
         try
@@ -118,6 +160,13 @@ public abstract class AbstractCrudHandler
         }
     }
 
+    /**
+     * Executes a query with the specified SQL query and parameters.
+     *
+     * @param query the SQL query to execute
+     * @param params the parameters to bind to the query
+     * @return a Future representing the result of the query execution
+     */
     Future<JsonObject> executeQuery(String query, List<Object> params)
     {
         var request = new JsonObject()
@@ -131,6 +180,12 @@ public abstract class AbstractCrudHandler
         return databaseService.executeQuery(request);
     }
 
+    /**
+     * Executes a query with the specified SQL query.
+     *
+     * @param query the SQL query to execute
+     * @return a Future representing the result of the query execution
+     */
     Future<JsonObject> executeQuery(String query)
     {
         return executeQuery(query, Collections.emptyList());

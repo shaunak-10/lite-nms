@@ -102,6 +102,12 @@ public class DatabaseServiceImpl implements DatabaseService
                 .recover(this::handleQueryError);
     }
 
+    /**
+     * Processes the result of a SQL query and converts it to a JSON object.
+     *
+     * @param result the result set from the database query
+     * @return a JsonObject containing "success", "rowCount", and optionally a "rows" array with row data
+     */
     private JsonObject processQueryResult(RowSet<Row> result)
     {
         var response = new JsonObject()
@@ -154,6 +160,12 @@ public class DatabaseServiceImpl implements DatabaseService
         return response;
     }
 
+    /**
+     * Handles errors encountered during database query execution.
+     *
+     * @param error the Throwable representing the cause of the failure
+     * @return a failed Future containing a JSON-formatted error response
+     */
     private Future<JsonObject> handleQueryError(Throwable error)
     {
         LOGGER.error("Database query failed: " + error.getMessage());
