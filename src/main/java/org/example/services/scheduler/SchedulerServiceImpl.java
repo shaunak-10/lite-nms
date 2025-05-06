@@ -17,6 +17,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.example.constants.AppConstants.FALSE;
+import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.ProvisionField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
@@ -65,24 +67,24 @@ public class SchedulerServiceImpl implements SchedulerService
                 LOGGER.info("Running scheduled polling task");
 
                 var request = new JsonObject()
-                        .put("query", DATA_TO_PLUGIN_FOR_POLLING)
-                        .put("params", Collections.emptyList());
+                        .put(QUERY, DATA_TO_PLUGIN_FOR_POLLING)
+                        .put(PARAMS, Collections.emptyList());
 
                 databaseService.executeQuery(request)
                         .onSuccess(dbResponse ->
                         {
                             try
                             {
-                                if (!dbResponse.getBoolean("success"))
+                                if (!dbResponse.getBoolean(SUCCESS))
                                 {
-                                    LOGGER.warn("DB query failed: " + dbResponse.getString("error"));
+                                    LOGGER.warn("DB query failed: " + dbResponse.getString(ERROR));
 
                                     return;
                                 }
 
                                 var devices = new JsonArray();
 
-                                for (var rowObj : dbResponse.getJsonArray("rows", new JsonArray()))
+                                for (var rowObj : dbResponse.getJsonArray(ROWS, new JsonArray()))
                                 {
                                     var row = (JsonObject) rowObj;
 
@@ -144,7 +146,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                                         return null;
                                                     }
                                                 },
-                                                false // Ordered execution not required
+                                                FALSE // Ordered execution not required
                                         ))
                                         .collect(Collectors.toList());
 
@@ -198,8 +200,8 @@ public class SchedulerServiceImpl implements SchedulerService
                                                 LOGGER.info("No devices passed PING and PORT checks.");
 
                                                 return Future.succeededFuture(new JsonObject()
-                                                        .put("availabilityParams", new JsonArray(availabilityParams))
-                                                        .put("metricsResults", new JsonArray()));
+                                                        .put(AVAILABILITY_PARAMS, new JsonArray(availabilityParams))
+                                                        .put(METRICS_RESULTS, new JsonArray()));
                                             }
 
                                             // Perform SSH metrics collection in executeBlocking
@@ -216,24 +218,24 @@ public class SchedulerServiceImpl implements SchedulerService
                                                             return new JsonArray();
                                                         }
                                                     },
-                                                    false
+                                                    FALSE
                                             ).map(metricsResults -> new JsonObject()
-                                                    .put("availabilityParams", new JsonArray(availabilityParams))
-                                                    .put("metricsResults", metricsResults));
+                                                    .put(AVAILABILITY_PARAMS, new JsonArray(availabilityParams))
+                                                    .put(METRICS_RESULTS, metricsResults));
                                         })
                                         .onSuccess(result ->
                                         {
                                             // Process and insert metrics results
                                             try
                                             {
-                                                var availabilityParams = result.getJsonArray("availabilityParams");
+                                                var availabilityParams = result.getJsonArray(AVAILABILITY_PARAMS);
 
-                                                var metricsResults = result.getJsonArray("metricsResults");
+                                                var metricsResults = result.getJsonArray(METRICS_RESULTS);
 
                                                 // Update availability data in database
                                                 databaseService.executeBatch(new JsonObject()
-                                                                .put("query", ADD_AVAILABILITY_DATA)
-                                                                .put("params", availabilityParams))
+                                                                .put(QUERY, ADD_AVAILABILITY_DATA)
+                                                                .put(PARAMS, availabilityParams))
                                                         .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
                                                         .onFailure(err -> LOGGER.error("Availability insert failed: " + err.getMessage()));
 
@@ -256,9 +258,9 @@ public class SchedulerServiceImpl implements SchedulerService
 
                                                         var metrics = metricResult.copy();
 
-                                                        metrics.remove("id");
+                                                        metrics.remove(ID);
 
-                                                        batchParams.add(List.of(metricResult.getInteger("id"), metrics.encode()));
+                                                        batchParams.add(List.of(metricResult.getInteger(ID), metrics.encode()));
                                                     }
                                                     catch (Exception e)
                                                     {
@@ -267,17 +269,17 @@ public class SchedulerServiceImpl implements SchedulerService
                                                 }
 
                                                 databaseService.executeBatch(new JsonObject()
-                                                                .put("query", INSERT_POLLING_RESULT)
-                                                                .put("params", new JsonArray(batchParams)))
+                                                                .put(QUERY, INSERT_POLLING_RESULT)
+                                                                .put(PARAMS, new JsonArray(batchParams)))
                                                         .onSuccess(batchResponse ->
                                                         {
-                                                            if (batchResponse.getBoolean("success"))
+                                                            if (batchResponse.getBoolean(SUCCESS))
                                                             {
                                                                 LOGGER.info("Successfully inserted " + batchParams.size() + " polling results.");
                                                             }
                                                             else
                                                             {
-                                                                LOGGER.warn("Batch insert failed: " + batchResponse.getString("error"));
+                                                                LOGGER.warn("Batch insert failed: " + batchResponse.getString(ERROR));
                                                             }
                                                         })
                                                         .onFailure(err -> LOGGER.error("Batch insert failed: " + err.getMessage()));
@@ -293,11 +295,11 @@ public class SchedulerServiceImpl implements SchedulerService
 
                                             // Update availability as false for all devices on failure
 
-                                            var availabilityParams = getEntries(devices).getJsonArray("availabilityParams");
+                                            var availabilityParams = getEntries(devices).getJsonArray(AVAILABILITY_PARAMS);
 
                                             databaseService.executeBatch(new JsonObject()
-                                                            .put("query", ADD_AVAILABILITY_DATA)
-                                                            .put("params", availabilityParams))
+                                                            .put(QUERY, ADD_AVAILABILITY_DATA)
+                                                            .put(PARAMS, availabilityParams))
                                                     .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
                                                     .onFailure(e -> LOGGER.error("Availability insert failed: " + e.getMessage()));
                                         });
@@ -331,9 +333,9 @@ public class SchedulerServiceImpl implements SchedulerService
         {
             var deviceId = devices.getJsonObject(i).getInteger(ID);
 
-            availabilityParams.add(List.of(deviceId, false));
+            availabilityParams.add(List.of(deviceId, FALSE));
         }
         return new JsonObject()
-                .put("availabilityParams", new JsonArray(availabilityParams));
+                .put(AVAILABILITY_PARAMS, new JsonArray(availabilityParams));
     }
 }

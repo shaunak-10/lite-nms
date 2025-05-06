@@ -13,6 +13,7 @@ import org.example.services.db.DatabaseVerticle;
 import java.util.Collections;
 import java.util.List;
 
+import static org.example.constants.AppConstants.DiscoveryField.ID;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
 import static org.example.constants.AppConstants.Headers.*;
@@ -73,7 +74,7 @@ public abstract class AbstractCrudHandler
     {
         try
         {
-            var idParam = ctx.pathParam("id");
+            var idParam = ctx.pathParam(ID);
 
             if (idParam == null)
             {
@@ -170,11 +171,11 @@ public abstract class AbstractCrudHandler
     Future<JsonObject> executeQuery(String query, List<Object> params)
     {
         var request = new JsonObject()
-                .put("query", query);
+                .put(QUERY, query);
 
         if (params != null && !params.isEmpty())
         {
-            request.put("params", new JsonArray(params));
+            request.put(PARAMS, new JsonArray(params));
         }
 
         return databaseService.executeQuery(request);

@@ -12,6 +12,7 @@ import org.example.utils.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static org.example.constants.AppConstants.*;
 import static org.example.constants.AppConstants.CredentialField.NAME;
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
@@ -73,7 +74,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                     {
                                         try
                                         {
-                                            var rows = result.getJsonArray("rows");
+                                            var rows = result.getJsonArray(ROWS);
 
                                             if (rows != null && !rows.isEmpty())
                                             {
@@ -82,11 +83,11 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                                 LOGGER.info("Discovery profile added with ID: " + id);
 
                                                 ctx.vertx().eventBus().send(DiscoveryVerticle.SERVICE_ADDRESS, new JsonObject()
-                                                        .put("action", "fetchDeviceDetailsAndRunDiscovery")
-                                                        .put("discoveryId", id)
-                                                        .put("ip", validIp)
-                                                        .put("port", port)
-                                                        .put("credentialProfileId", credentialProfileId));
+                                                        .put(ACTION, SAVE_AND_RUN_DISCOVERY)
+                                                        .put(ID, id)
+                                                        .put(IP, validIp)
+                                                        .put(PORT, port)
+                                                        .put(CREDENTIAL_PROFILE_ID, credentialProfileId));
 
                                                 handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
                                             }
@@ -134,7 +135,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = result.getJsonArray("rows", new JsonArray());
+                            var rows = result.getJsonArray(ROWS, new JsonArray());
 
                             var discoveryList = new JsonArray();
 
@@ -150,7 +151,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                             .put(IP, row.getString(IP))
                                             .put(PORT, row.getInteger(PORT))
                                             .put(STATUS, row.getString(STATUS))
-                                            .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
+                                            .put(CREDENTIAL_PROFILE_ID_RESPONSE, row.getInteger(CREDENTIAL_PROFILE_ID)));
                                 }
                                 catch (Exception e)
                                 {
@@ -192,7 +193,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = result.getJsonArray("rows", new JsonArray());
+                            var rows = result.getJsonArray(ROWS, new JsonArray());
 
                             if (rows.isEmpty())
                             {
@@ -208,7 +209,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                         .put(IP, row.getString(IP))
                                         .put(PORT, row.getInteger(PORT))
                                         .put(STATUS, row.getString(STATUS))
-                                        .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID)));
+                                        .put(CREDENTIAL_PROFILE_ID_RESPONSE, row.getInteger(CREDENTIAL_PROFILE_ID)));
                             }
                         }
                         catch (Exception e)
@@ -267,7 +268,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                     {
                                         try
                                         {
-                                            var rowCount = result.getInteger("rowCount", 0);
+                                            var rowCount = result.getInteger(ROW_COUNT, 0);
 
                                             if (rowCount == 0)
                                             {
@@ -321,7 +322,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rowCount = result.getInteger("rowCount", 0);
+                            var rowCount = result.getInteger(ROW_COUNT, 0);
 
                             if (rowCount == 0)
                             {
@@ -350,7 +351,6 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
     /**
      * Runs the discovery process for a given discovery profile ID.
-     *
      * This method validates the discovery profile ID from the URL path, fetches the relevant data from the database,
      * and then sends the data to the DiscoveryVerticle for processing. If the profile data is not found or there is an error,
      * it sends an appropriate response to the client.
@@ -372,7 +372,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = dbRes.getJsonArray("rows", new JsonArray());
+                            var rows = dbRes.getJsonArray(ROWS, new JsonArray());
 
                             if (rows.isEmpty())
                             {
@@ -384,8 +384,8 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                                 // Send data to DiscoveryVerticle to process
                                 var discoveryData = new JsonObject()
-                                        .put("action", "startDiscovery")
-                                        .put("device", new JsonObject()
+                                        .put(ACTION, START_DISCOVERY)
+                                        .put(DEVICE, new JsonObject()
                                                 .put(ID, row.getInteger(ID))
                                                 .put(PORT, row.getInteger(PORT))
                                                 .put(IP, row.getString(IP))
@@ -426,14 +426,13 @@ public class DiscoveryHandler extends AbstractCrudHandler
         {
             LOGGER.error("Invalid port: " + e.getMessage());
 
-            return true;
+            return TRUE;
         }
 
     }
 
     /**
      * Validates the required fields for the discovery profile in the request body.
-     *
      * Checks if the body is present and contains the necessary fields: name, IP, and credentialProfileId.
      * If any of the fields are missing, an error response is sent to the client.
      *
@@ -449,7 +448,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
             {
                 handleMissingData(ctx, INVALID_JSON_BODY);
 
-                return true;
+                return TRUE;
             }
 
             var name = body.getString(NAME);
@@ -462,16 +461,16 @@ public class DiscoveryHandler extends AbstractCrudHandler
             {
                 handleMissingData(ctx, MISSING_FIELDS);
 
-                return true;
+                return TRUE;
             }
 
-            return false;
+            return FALSE;
         }
         catch (Exception e)
         {
             LOGGER.error("Error while validating discovery fields: " + e.getMessage());
 
-            return true;
+            return TRUE;
         }
 
     }

@@ -13,6 +13,10 @@ import io.vertx.sqlclient.Tuple;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.example.constants.AppConstants.FALSE;
+import static org.example.constants.AppConstants.JsonKey.*;
+import static org.example.constants.AppConstants.TRUE;
+
 public class DatabaseServiceImpl implements DatabaseService
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseServiceImpl.class);
@@ -28,19 +32,19 @@ public class DatabaseServiceImpl implements DatabaseService
 
             return Future.failedFuture(
                     String.valueOf(new JsonObject()
-                            .put("success", false)
-                            .put("error", "Database client is not initialized"))
+                            .put(SUCCESS, FALSE)
+                            .put(ERROR, "Database client is not initialized"))
             );
         }
         else
         {
-            var query = request.getString("query");
+            var query = request.getString(QUERY);
 
             LOGGER.trace("Executing query: " + query);
 
-            if (request.containsKey("params"))
+            if (request.containsKey(PARAMS))
             {
-                var paramsArray = request.getJsonArray("params");
+                var paramsArray = request.getJsonArray(PARAMS);
 
                 var params = Tuple.tuple();
 
@@ -67,16 +71,16 @@ public class DatabaseServiceImpl implements DatabaseService
     @Override
     public Future<JsonObject> executeBatch(JsonObject request)
     {
-        var query = request.getString("query");
+        var query = request.getString(QUERY);
 
-        var paramsArray = request.getJsonArray("params");
+        var paramsArray = request.getJsonArray(PARAMS);
 
         if (paramsArray == null || paramsArray.isEmpty())
         {
             return Future.failedFuture(
                     String.valueOf(new JsonObject()
-                            .put("success", false)
-                            .put("error", "No parameters provided"))
+                            .put(SUCCESS, FALSE)
+                            .put(ERROR, "No parameters provided"))
             );
         }
 
@@ -111,8 +115,8 @@ public class DatabaseServiceImpl implements DatabaseService
     private JsonObject processQueryResult(RowSet<Row> result)
     {
         var response = new JsonObject()
-                .put("success", true)
-                .put("rowCount", result.rowCount());
+                .put(SUCCESS, TRUE)
+                .put(ROW_COUNT, result.rowCount());
 
         if (result.size() == 0)
         {
@@ -154,7 +158,7 @@ public class DatabaseServiceImpl implements DatabaseService
 
         if (!rows.isEmpty())
         {
-            response.put("rows", rows);
+            response.put(ROWS, rows);
         }
 
         return response;
@@ -172,8 +176,8 @@ public class DatabaseServiceImpl implements DatabaseService
 
         return Future.failedFuture(
                 String.valueOf(new JsonObject()
-                        .put("success", false)
-                        .put("error", error.getMessage()))
+                        .put(SUCCESS, FALSE)
+                        .put(ERROR, error.getMessage()))
         );
     }
 }

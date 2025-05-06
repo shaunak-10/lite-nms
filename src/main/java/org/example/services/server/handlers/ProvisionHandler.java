@@ -7,6 +7,10 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
+import static org.example.constants.AppConstants.ProvisionField.AVAILABILITY_PERCENT_RESPONSE;
+import static org.example.constants.AppConstants.ProvisionField.AVAILABILITY_PERCENT;
+import static org.example.constants.AppConstants.ProvisionField.POLLING_RESULTS_RESPONSE;
+import static org.example.constants.AppConstants.ProvisionField.POLLING_RESULTS;
 import static org.example.constants.AppConstants.ProvisionField.DISCOVERY_PROFILE_ID;
 import static org.example.constants.AppConstants.ProvisionQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
@@ -58,7 +62,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = result.getJsonArray("rows");
+                            var rows = result.getJsonArray(ROWS);
 
                             if (rows == null || rows.isEmpty())
                             {
@@ -86,7 +90,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                                     {
                                         try
                                         {
-                                            var insertRows = insertResult.getJsonArray("rows");
+                                            var insertRows = insertResult.getJsonArray(ROWS);
 
                                             if (insertRows != null && !insertRows.isEmpty())
                                             {
@@ -137,7 +141,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = result.getJsonArray("rows", new JsonArray());
+                            var rows = result.getJsonArray(ROWS, new JsonArray());
 
                             var provisionList = new JsonArray();
 
@@ -152,9 +156,9 @@ public class ProvisionHandler extends AbstractCrudHandler
                                             .put(NAME, row.getString(NAME))
                                             .put(IP, row.getString(IP))
                                             .put(PORT, row.getInteger(PORT))
-                                            .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
-                                            .put("availability_percent", row.getDouble("availability_percent", 0.0))
-                                            .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
+                                            .put(CREDENTIAL_PROFILE_ID_RESPONSE, row.getInteger(CREDENTIAL_PROFILE_ID))
+                                            .put(AVAILABILITY_PERCENT_RESPONSE, row.getDouble(AVAILABILITY_PERCENT, 0.0))
+                                            .put(POLLING_RESULTS_RESPONSE, row.getJsonArray(POLLING_RESULTS, new JsonArray()));
 
                                     provisionList.add(provision);
                                 }
@@ -198,7 +202,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = result.getJsonArray("rows", new JsonArray());
+                            var rows = result.getJsonArray(ROWS, new JsonArray());
 
                             if (rows.isEmpty())
                             {
@@ -213,9 +217,9 @@ public class ProvisionHandler extends AbstractCrudHandler
                                         .put(NAME, row.getString(NAME))
                                         .put(IP, row.getString(IP))
                                         .put(PORT, row.getInteger(PORT))
-                                        .put(CREDENTIAL_PROFILE_ID, row.getInteger(CREDENTIAL_PROFILE_ID))
-                                        .put("availability_percent", row.getDouble("availability_percent", 0.0))
-                                        .put("polling_results", row.getJsonArray("polling_results", new JsonArray()));
+                                        .put(CREDENTIAL_PROFILE_ID_RESPONSE, row.getInteger(CREDENTIAL_PROFILE_ID))
+                                        .put(AVAILABILITY_PERCENT_RESPONSE, row.getDouble(AVAILABILITY_PERCENT, 0.0))
+                                        .put(POLLING_RESULTS_RESPONSE, row.getJsonArray(POLLING_RESULTS, new JsonArray()));
 
                                 handleSuccess(ctx, provision);
                             }
@@ -256,7 +260,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rowCount = result.getInteger("rowCount", 0);
+                            var rowCount = result.getInteger(ROW_COUNT, 0);
 
                             if (rowCount == 0)
                             {

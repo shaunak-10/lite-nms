@@ -25,7 +25,6 @@ public interface SchedulerService
     /**
      * Starts periodic polling at the specified interval. If polling is already running,
      * this method will fail without starting a new timer.
-     *
      * Polling performs the following:
      * <ul>
      *     <li>Fetches provisioned device data from the database</li>

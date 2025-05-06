@@ -61,6 +61,8 @@ public class AppConstants
 
         public static final String CREDENTIAL_PROFILE_ID = "credential_profile_id";
 
+        public static final String CREDENTIAL_PROFILE_ID_RESPONSE = "credential.profile.id";
+
         public static final String ACTIVE = "active";
 
         public static final String INACTIVE = "inactive";
@@ -69,9 +71,10 @@ public class AppConstants
     public static class ProvisionQuery
     {
         public static final String ADD_PROVISION = "INSERT INTO provisioned_device (name, ip, port, credential_profile_id) VALUES ($1, $2, $3, $4) RETURNING id";
-        public static final String GET_ALL_PROVISIONS = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled_at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id GROUP BY pd.id";
 
-        public static final String GET_PROVISION_BY_ID = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled_at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id WHERE pd.id = $1 GROUP BY pd.id";
+        public static final String GET_ALL_PROVISIONS = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id GROUP BY pd.id";
+
+        public static final String GET_PROVISION_BY_ID = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id WHERE pd.id = $1 GROUP BY pd.id";
 
         public static final String DELETE_PROVISION = "DELETE FROM provisioned_device WHERE id = $1";
 
@@ -91,8 +94,16 @@ public class AppConstants
         public static final String PORT = "port";
 
         public static final String DISCOVERY_PROFILE_ID = "discovery_profile_id";
-    }
 
+        public static final String AVAILABILITY_PERCENT_RESPONSE = "availability.percent";
+
+        public static final String AVAILABILITY_PERCENT = "availability_percent";
+
+        public static final String POLLING_RESULTS_RESPONSE = "polling.results";
+
+        public static final String POLLING_RESULTS = "polling_results";
+
+    }
 
 
     public static class JsonKey
@@ -106,6 +117,26 @@ public class AppConstants
         public static final String ERROR = "error";
 
         public static final String DETAILS = "details";
+
+        public static final String SUCCESS = "success";
+
+        public static final String QUERY = "query";
+
+        public static final String PARAMS = "params";
+
+        public static final String ROW_COUNT = "rowCount";
+
+        public static final String ROWS = "rows";
+
+        public static final String ACTION = "action";
+
+        public static final String DEVICE = "device";
+
+        public static final String REACHABLE = "reachable";
+
+        public static final String AVAILABILITY_PARAMS = "availabilityParams";
+
+        public static final String METRICS_RESULTS = "metricsResults";
     }
 
     public static class Message
@@ -202,12 +233,18 @@ public class AppConstants
         public static final String NC_COMMAND = "nc";
 
         public static final String ZERO_IO = "-zv";
-
-        public static final String PORT = "port";
     }
 
     public static class ConfigKeys
     {
         public static final String PROCESS = "process";
     }
+
+    public static final String START_DISCOVERY = "startDiscovery";
+
+    public static final String SAVE_AND_RUN_DISCOVERY = "fetchCredentialsAndRunDiscovery";
+
+    public static final Boolean FALSE = false;
+
+    public static final Boolean TRUE = true;
 }

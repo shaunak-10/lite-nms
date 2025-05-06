@@ -17,13 +17,14 @@ import org.example.utils.ConnectivityUtil.CheckType;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
+import static org.example.constants.AppConstants.*;
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
+import static org.example.constants.AppConstants.JsonKey.*;
 
 /**
  * Verticle responsible for running discovery operations.
@@ -67,13 +68,13 @@ public class DiscoveryVerticle extends AbstractVerticle
         {
             var request = message.body();
 
-            var action = request.getString("action");
+            var action = request.getString(ACTION);
 
             switch (action)
             {
-                case "startDiscovery":
+                case START_DISCOVERY:
 
-                    var device = request.getJsonObject("device");
+                    var device = request.getJsonObject(DEVICE);
 
                     if (device == null)
                     {
@@ -84,16 +85,16 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                     startDiscoveryPipeline(new JsonArray().add(device), new JsonArray().add(new JsonObject()
                             .put(ID, device.getInteger(ID))
-                            .put("reachable", false)));
+                            .put(REACHABLE, FALSE)));
 
                     break;
 
-                case "fetchDeviceDetailsAndRunDiscovery":
+                case SAVE_AND_RUN_DISCOVERY:
 
-                    fetchDeviceDetailsAndRunDiscovery(request.getInteger("discoveryId"),
-                            request.getString("ip"),
-                            request.getInteger("port"),
-                            request.getInteger("credentialProfileId"));
+                    fetchCredentialsAndRunDiscovery(request.getInteger(ID),
+                            request.getString(IP),
+                            request.getInteger(PORT),
+                            request.getInteger(CREDENTIAL_PROFILE_ID));
 
                     break;
 
@@ -156,7 +157,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                                     return null;
                                 }
                             },
-                            false // Ordered execution not required
+                            FALSE // Ordered execution not required
                     ))
                     .collect(Collectors.toList());
 
@@ -200,7 +201,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                                             return new JsonArray();
                                         }
                                     },
-                                    false
+                                    FALSE
                             );
                         }
                         catch (Exception e)
@@ -226,7 +227,7 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                                         updatedResults.add(new JsonObject()
                                                 .put(ID, defaultResult.getInteger(ID))
-                                                .put("reachable", false));
+                                                .put(REACHABLE, FALSE));
                                     }
                                     catch (Exception e)
                                     {
@@ -245,7 +246,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                                     {
                                         var sshResult = sshResults.getJsonObject(i);
 
-                                        sshResultMap.put(sshResult.getInteger(ID), sshResult.getBoolean("reachable"));
+                                        sshResultMap.put(sshResult.getInteger(ID), sshResult.getBoolean(REACHABLE));
                                     }
                                     catch (Exception e)
                                     {
@@ -264,7 +265,7 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                                         updatedResults.add(new JsonObject()
                                                 .put(ID, id)
-                                                .put("reachable", sshResultMap.getOrDefault(id, false)));
+                                                .put(REACHABLE, sshResultMap.getOrDefault(id, FALSE)));
                                     }
                                     catch (Exception e)
                                     {
@@ -326,7 +327,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                         {
                             var id = result.getInteger(ID);
 
-                            return executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean("reachable") ? ACTIVE : INACTIVE, id))
+                            return executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean(REACHABLE) ? ACTIVE : INACTIVE, id))
                                     .onSuccess(res -> LOGGER.info("Discovery status updated for device ID: " + id))
                                     .onFailure(err -> LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage()));
                         }
@@ -359,7 +360,7 @@ public class DiscoveryVerticle extends AbstractVerticle
      * @param port                 the port number to check connectivity.
      * @param credentialProfileId  the associated credential_profile ID.
      */
-    private void fetchDeviceDetailsAndRunDiscovery(int id, String ip, int port, int credentialProfileId)
+    private void fetchCredentialsAndRunDiscovery(int id, String ip, int port, int credentialProfileId)
     {
         try
         {
@@ -367,7 +368,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                     .onSuccess(result -> {
                         try
                         {
-                            var rows = result.getJsonArray("rows", new JsonArray());
+                            var rows = result.getJsonArray(ROWS, new JsonArray());
 
                             if (rows.isEmpty())
                             {
@@ -392,7 +393,7 @@ public class DiscoveryVerticle extends AbstractVerticle
                             startDiscoveryPipeline(new JsonArray().add(device),
                                     new JsonArray().add(new JsonObject()
                                             .put(ID, id)
-                                            .put("reachable", false)));
+                                            .put(REACHABLE, FALSE)));
                         }
                         catch (Exception e)
                         {
@@ -418,11 +419,11 @@ public class DiscoveryVerticle extends AbstractVerticle
     Future<JsonObject> executeQuery(String query, List<Object> params)
     {
         var request = new JsonObject()
-                .put("query", query);
+                .put(QUERY, query);
 
         if (params != null && !params.isEmpty())
         {
-            request.put("params", new JsonArray(params));
+            request.put(PARAMS, new JsonArray(params));
         }
 
         return DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS).executeQuery(request);

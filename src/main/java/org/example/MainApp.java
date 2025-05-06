@@ -39,8 +39,6 @@ public class MainApp
             {
                 try
                 {
-
-
                     if (dbRes.failed())
                     {
                         LOGGER.error("❌ Failed to connect to DB: " + dbRes.cause());

@@ -15,6 +15,7 @@ import org.example.MainApp;
 import org.example.utils.ConfigLoader;
 
 import static org.example.constants.AppConstants.Headers.*;
+import static org.example.constants.AppConstants.JsonKey.ERROR;
 
 /**
  * Handles authentication-related operations including:
@@ -191,7 +192,7 @@ public class AuthHandler
                             .setStatusCode(401)
                             .putHeader(CONTENT_TYPE, APPLICATION_JSON)
                             .end(new JsonObject()
-                                    .put("error", "Unauthorized: Please login first")
+                                    .put(ERROR, "Unauthorized: Please login first")
                                     .encodePrettily());
                 }
                 else

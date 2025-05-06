@@ -83,8 +83,7 @@ public class ConnectivityUtil
                 }
                 catch (Exception e)
                 {
-                    // Log error or handle exception if needed
-                    System.err.println("Error checking connectivity: " + e.getMessage());
+                    LOGGER.error(e.getMessage());
                 }
                 finally
                 {

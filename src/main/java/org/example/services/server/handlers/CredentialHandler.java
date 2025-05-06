@@ -11,8 +11,10 @@ import java.util.List;
 
 import static org.example.constants.AppConstants.CredentialQuery.*;
 import static org.example.constants.AppConstants.CredentialField.*;
+import static org.example.constants.AppConstants.FALSE;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
+import static org.example.constants.AppConstants.TRUE;
 
 public class CredentialHandler extends AbstractCrudHandler
 {
@@ -49,7 +51,7 @@ public class CredentialHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = result.getJsonArray("rows");
+                            var rows = result.getJsonArray(ROWS);
 
                             if (rows != null && !rows.isEmpty())
                             {
@@ -93,7 +95,7 @@ public class CredentialHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = result.getJsonArray("rows", new JsonArray());
+                            var rows = result.getJsonArray(ROWS, new JsonArray());
 
                             var credentialList = new JsonArray();
 
@@ -148,7 +150,7 @@ public class CredentialHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rows = result.getJsonArray("rows", new JsonArray());
+                            var rows = result.getJsonArray(ROWS, new JsonArray());
 
                             if (rows.isEmpty())
                             {
@@ -199,7 +201,7 @@ public class CredentialHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rowCount = result.getInteger("rowCount", 0);
+                            var rowCount = result.getInteger(ROW_COUNT, 0);
 
                             if (rowCount == 0)
                             {
@@ -241,7 +243,7 @@ public class CredentialHandler extends AbstractCrudHandler
                     {
                         try
                         {
-                            var rowCount = result.getInteger("rowCount", 0);
+                            var rowCount = result.getInteger(ROW_COUNT, 0);
 
                             if (rowCount == 0)
                             {
@@ -285,23 +287,23 @@ public class CredentialHandler extends AbstractCrudHandler
             {
                 handleMissingData(ctx, INVALID_JSON_BODY);
 
-                return true;
+                return TRUE;
             }
 
             if (body.getString(NAME) == null || body.getString(USERNAME) == null || body.getString(PASSWORD) == null)
             {
                 handleMissingData(ctx, MISSING_FIELDS);
 
-                return true;
+                return TRUE;
             }
 
-            return false;
+            return FALSE;
         }
         catch (Exception e)
         {
             LOGGER.error("Error while validating credential fields: " + e.getMessage());
 
-            return true;
+            return TRUE;
         }
     }
 }
