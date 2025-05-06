@@ -10,7 +10,8 @@
   "process": {
     "timeout": 4
   },
-  "polling.interval": 10000,
+  "scheduler.interval": 10000,
+  "polling.interval": 30000,
   "ip.resolution.timeout": 2000,
   "database.connection.timeout": 5000,
   "database.idle.timeout": 300000,

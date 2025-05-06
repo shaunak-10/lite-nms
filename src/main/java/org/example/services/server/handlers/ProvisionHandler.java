@@ -5,6 +5,9 @@ import io.vertx.core.impl.logging.LoggerFactory;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.example.MainApp;
+import org.example.services.scheduler.SchedulerService;
+import org.example.services.scheduler.SchedulerVerticle;
 
 import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.ProvisionField.AVAILABILITY_PERCENT_RESPONSE;
@@ -25,7 +28,12 @@ public class ProvisionHandler extends AbstractCrudHandler
 
     private static final ProvisionHandler INSTANCE = new ProvisionHandler();
 
-    private ProvisionHandler() {}
+    SchedulerService schedulerService;
+
+    private ProvisionHandler()
+    {
+        schedulerService = SchedulerService.createProxy(MainApp.getVertx(), SchedulerVerticle.SERVICE_ADDRESS);
+    }
 
     public static ProvisionHandler getInstance()
     {
@@ -97,6 +105,8 @@ public class ProvisionHandler extends AbstractCrudHandler
                                                 var id = insertRows.getJsonObject(0).getInteger(ID);
 
                                                 LOGGER.info("Provisioned device added with ID: " + id);
+
+                                                schedulerService.addEntry(id);
 
                                                 handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
                                             }
@@ -269,6 +279,8 @@ public class ProvisionHandler extends AbstractCrudHandler
                             else
                             {
                                 LOGGER.info("Provisioned device deleted with ID: " + id);
+
+                                schedulerService.removeEntry(id);
 
                                 handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                             }

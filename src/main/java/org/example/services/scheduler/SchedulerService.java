@@ -3,6 +3,8 @@ package org.example.services.scheduler;
 import io.vertx.codegen.annotations.ProxyGen;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import org.example.services.db.DatabaseService;
+import org.example.services.db.DatabaseServiceVertxEBProxy;
 
 /**
  * SchedulerService is a Vert.x service interface used to manage
@@ -22,6 +24,11 @@ public interface SchedulerService
         return new SchedulerServiceImpl(vertx);
     }
 
+    static SchedulerService createProxy(Vertx vertx, String address)
+    {
+        return new SchedulerServiceVertxEBProxy(vertx, address);
+    }
+
     /**
      * Starts periodic polling at the specified interval. If polling is already running,
      * this method will fail without starting a new timer.
@@ -39,4 +46,8 @@ public interface SchedulerService
      * @return a succeeded Future if polling started, or a failed Future if already running
      */
     Future<String> startPolling(int interval);
+
+    Future<Void> addEntry(int id);
+
+    Future<Void> removeEntry(int id);
 }
