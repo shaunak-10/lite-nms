@@ -12,6 +12,7 @@ import io.vertx.ext.auth.jwt.JWTAuthOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.JWTAuthHandler;
 import org.example.MainApp;
+import org.example.utils.ConfigLoader;
 
 import static org.example.constants.AppConstants.Headers.*;
 
@@ -83,12 +84,12 @@ public class AuthHandler
                             .putHeader(CONTENT_TYPE, APPLICATION_JSON)
                             .putHeader("Set-Cookie", "refresh_token=" + jwtAuth.generateToken(
                                     claims,
-                                    new JWTOptions().setExpiresInMinutes(60 * 24 * 7)) +
+                                    new JWTOptions().setExpiresInMinutes(ConfigLoader.get().getInteger("jwt.refresh.token.expire",60*24*7))) +
                                     "; HttpOnly; SameSite=Strict; Path=/refresh")
                             .end(new JsonObject()
                                     .put("access_token", jwtAuth.generateToken(
                                             claims,
-                                            new JWTOptions().setExpiresInMinutes(60 * 24)))
+                                            new JWTOptions().setExpiresInMinutes(ConfigLoader.get().getInteger("jwt.access.token.expire", 15))))
                                     .encodePrettily());
                 }
                 else

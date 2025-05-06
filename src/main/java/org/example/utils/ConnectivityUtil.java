@@ -74,10 +74,7 @@ public class ConnectivityUtil
                 {
                     process = new ProcessBuilder(command).start();
 
-                    // Get timeout from config
-                    var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
-
-                    var exitCode = process.waitFor(timeout, TimeUnit.SECONDS) ? process.exitValue() : -1;
+                    var exitCode = process.waitFor(ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT), TimeUnit.SECONDS) ? process.exitValue() : -1;
 
                     if (exitCode == 0)
                     {

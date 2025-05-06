@@ -18,7 +18,7 @@ import static org.example.constants.AppConstants.AddressesAndPaths.CONFIG_FILE_P
 
 public class MainApp
 {
-    private static final int VERTX_WORKER_POOL_SIZE = 30;
+    private static final int VERTX_WORKER_POOL_SIZE = 10;
 
     private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(VERTX_WORKER_POOL_SIZE));
 
@@ -31,14 +31,15 @@ public class MainApp
 
     public static void main(String[] args)
     {
-
         try
         {
+            ConfigLoader.init(CONFIG_FILE_PATH);
+
             DatabaseClient.testConnection(dbRes ->
             {
                 try
                 {
-                    ConfigLoader.init(CONFIG_FILE_PATH);
+
 
                     if (dbRes.failed())
                     {
@@ -68,8 +69,10 @@ public class MainApp
 
                             deployAllVerticles()
                                     .onSuccess(v -> LOGGER.info("🚀 All verticles deployed successfully!"))
-                                    .onFailure(err -> {
+                                    .onFailure(err ->
+                                    {
                                         LOGGER.error("❌ Failed to deploy verticles: " + err.getMessage());
+
                                         vertx.close();
                                     });
                         }

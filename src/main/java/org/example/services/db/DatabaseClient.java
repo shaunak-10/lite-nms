@@ -10,6 +10,7 @@ import io.vertx.pgclient.PgConnectOptions;
 import io.vertx.sqlclient.PoolOptions;
 import io.vertx.sqlclient.SqlClient;
 import io.vertx.pgclient.PgBuilder;
+import org.example.utils.ConfigLoader;
 
 
 /**
@@ -38,15 +39,15 @@ public class DatabaseClient
             try
             {
                 client = PgBuilder.client()
-                        .with(new PoolOptions().setMaxSize(10))
+                        .with(new PoolOptions().setMaxSize(ConfigLoader.get().getInteger("database.pool.size", 5)))
                         .connectingTo(new PgConnectOptions()
                                 .setPort(Integer.parseInt(dotenv.get("DB_PORT")))
                                 .setHost(dotenv.get("DB_HOST"))
                                 .setDatabase(dotenv.get("DB_NAME"))
                                 .setUser(dotenv.get("DB_USER"))
                                 .setPassword(dotenv.get("DB_PASSWORD"))
-                                .setConnectTimeout(5000)
-                                .setIdleTimeout(5 * 60 * 1000))
+                                .setConnectTimeout(ConfigLoader.get().getInteger("database.connection.timeout", 5000))
+                                .setIdleTimeout(ConfigLoader.get().getInteger("database.idle.timeout", 300000)))
                         .build();
             }
             catch (Exception ex)

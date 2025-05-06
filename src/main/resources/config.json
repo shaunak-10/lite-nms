@@ -10,6 +10,13 @@
   "process": {
     "timeout": 4
   },
-  "polling-interval": 10000,
-  "ip.resolution.timeout": 2000
+  "polling.interval": 10000,
+  "ip.resolution.timeout": 2000,
+  "database.connection.timeout": 5000,
+  "database.idle.timeout": 300000,
+  "database.pool.size": 5,
+  "jwt.access.token.expire": 1440,
+  "jwt.refresh.token.expire": 10080,
+  "http.server.port": 8888,
+  "vertx.worker.pool.size": 5
 }

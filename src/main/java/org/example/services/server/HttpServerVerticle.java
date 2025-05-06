@@ -10,6 +10,7 @@ import org.example.services.server.routes.ProvisionRoutes;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
+import org.example.utils.ConfigLoader;
 
 /**
  * Verticle responsible for initializing and starting the HTTP server.
@@ -50,7 +51,7 @@ public class HttpServerVerticle extends AbstractVerticle
             // Start the HTTP server
             vertx.createHttpServer()
                     .requestHandler(router)
-                    .listen(8888, http ->
+                    .listen(ConfigLoader.get().getInteger("http.server.port",8888), http ->
                     {
                         try
                         {

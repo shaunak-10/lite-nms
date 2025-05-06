@@ -25,7 +25,7 @@ public class SchedulerVerticle extends AbstractVerticle
                     .setAddress(SERVICE_ADDRESS)
                     .register(SchedulerService.class, SchedulerService.create(vertx));
 
-            SchedulerService.create(vertx).startPolling(ConfigLoader.get().getInteger("polling-interval"));
+            SchedulerService.create(vertx).startPolling(ConfigLoader.get().getInteger("polling.interval",10000));
 
             startPromise.complete();
         }

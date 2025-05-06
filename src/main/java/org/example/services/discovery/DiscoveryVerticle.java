@@ -15,6 +15,7 @@ import org.example.utils.DecryptionUtil;
 import org.example.utils.ConnectivityUtil;
 import org.example.utils.ConnectivityUtil.CheckType;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -212,31 +213,64 @@ public class DiscoveryVerticle extends AbstractVerticle
                     .onSuccess(sshResults -> {
                         try
                         {
-                            // Prepare updated results based on SSH outcomes
                             var updatedResults = new JsonArray();
 
-                            for (var i = 0; i < defaultResults.size(); i++)
+                            if (sshResults.isEmpty())
                             {
-                                var defaultResult = defaultResults.getJsonObject(i);
-
-                                var updatedResult = new JsonObject()
-                                        .put(ID, defaultResult.getInteger(ID))
-                                        .put("reachable", false);
-
-                                // Check if this device passed SSH
-                                for (var j = 0; j < sshResults.size(); j++)
+                                // If no results from SSH, all devices are unreachable
+                                for (int i = 0; i < defaultResults.size(); i++)
                                 {
-                                    var sshResult = sshResults.getJsonObject(j);
-
-                                    if (Objects.equals(sshResult.getInteger(ID), defaultResult.getInteger(ID)))
+                                    try
                                     {
-                                        updatedResult.put("reachable", sshResult.getBoolean("reachable"));
+                                        var defaultResult = defaultResults.getJsonObject(i);
 
-                                        break;
+                                        updatedResults.add(new JsonObject()
+                                                .put(ID, defaultResult.getInteger(ID))
+                                                .put("reachable", false));
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        LOGGER.error("Error processing default result: " + e.getMessage());
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // Build lookup map only when needed
+                                var sshResultMap = new HashMap<Integer, Boolean>();
+
+                                for (int i = 0; i < sshResults.size(); i++)
+                                {
+                                    try
+                                    {
+                                        var sshResult = sshResults.getJsonObject(i);
+
+                                        sshResultMap.put(sshResult.getInteger(ID), sshResult.getBoolean("reachable"));
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        LOGGER.error("Error processing SSH result: " + e.getMessage());
                                     }
                                 }
 
-                                updatedResults.add(updatedResult);
+                                // Generate updated results
+                                for (int i = 0; i < defaultResults.size(); i++)
+                                {
+                                    try
+                                    {
+                                        var defaultResult = defaultResults.getJsonObject(i);
+
+                                        int id = defaultResult.getInteger(ID);
+
+                                        updatedResults.add(new JsonObject()
+                                                .put(ID, id)
+                                                .put("reachable", sshResultMap.getOrDefault(id, false)));
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        LOGGER.error("Error processing default result: " + e.getMessage());
+                                    }
+                                }
                             }
 
                             LOGGER.info("Discovery completed. Updating status for devices.");

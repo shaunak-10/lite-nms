@@ -48,8 +48,6 @@ public class PluginOperationsUtil
      */
     private static JsonArray executePlugin(JsonArray devices, String command) throws Exception
     {
-        var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
-
         Process process = null;
 
         try
@@ -88,7 +86,7 @@ public class PluginOperationsUtil
                 }
             }
 
-            var exitCode = process.waitFor(timeout, TimeUnit.SECONDS) ? process.exitValue() : -1;
+            var exitCode = process.waitFor(ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT), TimeUnit.SECONDS) ? process.exitValue() : -1;
 
             if (exitCode == 0)
             {
