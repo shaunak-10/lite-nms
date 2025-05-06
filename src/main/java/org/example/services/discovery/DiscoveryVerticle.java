@@ -119,132 +119,151 @@ public class DiscoveryVerticle extends AbstractVerticle
      */
     private void startDiscoveryPipeline(JsonArray devices, JsonArray defaultResults)
     {
-        // Process PING and PORT checks concurrently for each device
-        var deviceFutures = devices.stream()
-                .map(obj -> (JsonObject) obj)
-                .map(device -> vertx.executeBlocking(
-                        () ->
-                        {
-                            try
+        try
+        {
+            // Process PING and PORT checks concurrently for each device
+            var deviceFutures = devices.stream()
+                    .map(obj -> (JsonObject) obj)
+                    .map(device -> vertx.executeBlocking(
+                            () ->
                             {
-                                // Perform PING check
-                                var pingResult = ConnectivityUtil.filterReachableDevices(new JsonArray().add(device), CheckType.PING);
-
-                                if (pingResult.isEmpty())
-                                {
-                                    return null;
-                                }
-
-                                // Perform PORT check
-                                var portResult = ConnectivityUtil.filterReachableDevices(pingResult, CheckType.PORT);
-
-                                if (portResult.isEmpty())
-                                {
-                                    return null;
-                                }
-
-                                // Return the device that passed both checks
-                                return portResult.getJsonObject(0);
-                            }
-                            catch (Exception e)
-                            {
-                                LOGGER.error("Error processing device ID " + device.getInteger(ID) + ": " + e.getMessage());
-
-                                return null;
-                            }
-                        },
-                        false // Ordered execution not required
-                ))
-                .collect(Collectors.toList());
-
-        // Wait for all PING and PORT checks to complete
-        Future.all(deviceFutures)
-                .compose(composite ->
-                {
-                    // Collect devices that passed PING and PORT checks
-                    var reachableDevices = new JsonArray();
-
-                    for (var i = 0; i < composite.size(); i++)
-                    {
-                        var result = composite.resultAt(i);
-
-                        if (result instanceof JsonObject)
-                        {
-                            reachableDevices.add(result);
-                        }
-                    }
-
-                    if (reachableDevices.isEmpty())
-                    {
-                        LOGGER.info("No devices passed PING and PORT checks.");
-
-                        return Future.succeededFuture(new JsonArray());
-                    }
-
-                    // Perform SSH check for all reachable devices in executeBlocking
-                    return vertx.executeBlocking(
-                            () -> {
                                 try
                                 {
-                                    return PluginOperationsUtil.runSSHReachability(reachableDevices);
+                                    // Perform PING check
+                                    var pingResult = ConnectivityUtil.filterReachableDevices(new JsonArray().add(device), CheckType.PING);
+
+                                    if (pingResult.isEmpty())
+                                    {
+                                        return null;
+                                    }
+
+                                    // Perform PORT check
+                                    var portResult = ConnectivityUtil.filterReachableDevices(pingResult, CheckType.PORT);
+
+                                    if (portResult.isEmpty())
+                                    {
+                                        return null;
+                                    }
+
+                                    // Return the device that passed both checks
+                                    return portResult.getJsonObject(0);
                                 }
                                 catch (Exception e)
                                 {
-                                    LOGGER.error("SSH reachability check failed: " + e.getMessage());
+                                    LOGGER.error("Error processing device ID " + device.getInteger(ID) + ": " + e.getMessage());
 
-                                    return new JsonArray();
+                                    return null;
                                 }
                             },
-                            false
-                    );
-                })
-                .onSuccess(sshResults -> {
-                    try
+                            false // Ordered execution not required
+                    ))
+                    .collect(Collectors.toList());
+
+            // Wait for all PING and PORT checks to complete
+            Future.all(deviceFutures)
+                    .compose(composite ->
                     {
-                        // Prepare updated results based on SSH outcomes
-                        var updatedResults = new JsonArray();
-
-                        for (var i = 0; i < defaultResults.size(); i++)
+                        try
                         {
-                            var defaultResult = defaultResults.getJsonObject(i);
+                            // Collect devices that passed PING and PORT checks
+                            var reachableDevices = new JsonArray();
 
-                            var updatedResult = new JsonObject()
-                                    .put(ID, defaultResult.getInteger(ID))
-                                    .put("reachable", false);
-
-                            // Check if this device passed SSH
-                            for (var j = 0; j < sshResults.size(); j++)
+                            for (var i = 0; i < composite.size(); i++)
                             {
-                                var sshResult = sshResults.getJsonObject(j);
+                                var result = composite.resultAt(i);
 
-                                if (Objects.equals(sshResult.getInteger(ID), defaultResult.getInteger(ID)))
+                                if (result instanceof JsonObject)
                                 {
-                                    updatedResult.put("reachable", sshResult.getBoolean("reachable"));
-
-                                    break;
+                                    reachableDevices.add(result);
                                 }
                             }
 
-                            updatedResults.add(updatedResult);
+                            if (reachableDevices.isEmpty())
+                            {
+                                LOGGER.info("No devices passed PING and PORT checks.");
+
+                                return Future.succeededFuture(new JsonArray());
+                            }
+
+                            // Perform SSH check for all reachable devices in executeBlocking
+                            return vertx.executeBlocking(
+                                    () -> {
+                                        try
+                                        {
+                                            return PluginOperationsUtil.runSSHReachability(reachableDevices);
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            LOGGER.error("SSH reachability check failed: " + e.getMessage());
+
+                                            return new JsonArray();
+                                        }
+                                    },
+                                    false
+                            );
                         }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error during discovery pipeline: " + e.getMessage());
 
-                        LOGGER.info("Discovery completed. Updating status for devices.");
+                            return Future.failedFuture(e);
+                        }
+                    })
+                    .onSuccess(sshResults -> {
+                        try
+                        {
+                            // Prepare updated results based on SSH outcomes
+                            var updatedResults = new JsonArray();
 
-                        updateDiscoveryStatus(updatedResults);
-                    }
-                    catch (Exception e)
+                            for (var i = 0; i < defaultResults.size(); i++)
+                            {
+                                var defaultResult = defaultResults.getJsonObject(i);
+
+                                var updatedResult = new JsonObject()
+                                        .put(ID, defaultResult.getInteger(ID))
+                                        .put("reachable", false);
+
+                                // Check if this device passed SSH
+                                for (var j = 0; j < sshResults.size(); j++)
+                                {
+                                    var sshResult = sshResults.getJsonObject(j);
+
+                                    if (Objects.equals(sshResult.getInteger(ID), defaultResult.getInteger(ID)))
+                                    {
+                                        updatedResult.put("reachable", sshResult.getBoolean("reachable"));
+
+                                        break;
+                                    }
+                                }
+
+                                updatedResults.add(updatedResult);
+                            }
+
+                            LOGGER.info("Discovery completed. Updating status for devices.");
+
+                            updateDiscoveryStatus(updatedResults);
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while processing discovery results: " + e.getMessage());
+
+                            updateDiscoveryStatus(defaultResults);
+                        }
+                    })
+                    .onFailure(cause ->
                     {
-                        LOGGER.error("Error while processing discovery results: " + e.getMessage());
+                        LOGGER.error("Discovery pipeline failed: " + cause.getMessage());
 
                         updateDiscoveryStatus(defaultResults);
-                    }
-                })
-                .onFailure(cause ->
-                {
-                    LOGGER.error("Discovery pipeline failed: " + cause.getMessage());
+                    });
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error starting discovery pipeline: " + e.getMessage());
 
-                    updateDiscoveryStatus(defaultResults);
-                });
+            // Fallback to default results if any error occurs
+            updateDiscoveryStatus(defaultResults);
+        }
     }
 
     /**
@@ -269,11 +288,20 @@ public class DiscoveryVerticle extends AbstractVerticle
                     .map(obj -> (JsonObject) obj)
                     .map(result ->
                     {
-                        var id = result.getInteger(ID);
+                        try
+                        {
+                            var id = result.getInteger(ID);
 
-                        return executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean("reachable") ? ACTIVE : INACTIVE, id))
-                                .onSuccess(res -> LOGGER.info("Discovery status updated for device ID: " + id))
-                                .onFailure(err -> LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage()));
+                            return executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean("reachable") ? ACTIVE : INACTIVE, id))
+                                    .onSuccess(res -> LOGGER.info("Discovery status updated for device ID: " + id))
+                                    .onFailure(err -> LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage()));
+                        }
+                        catch (Exception e)
+                        {
+                            LOGGER.error("Error while updating discovery status for device ID " + result.getInteger(ID) + ": " + e.getMessage());
+
+                            return Future.failedFuture(e);
+                        }
                     })
                     .collect(Collectors.toList());
 

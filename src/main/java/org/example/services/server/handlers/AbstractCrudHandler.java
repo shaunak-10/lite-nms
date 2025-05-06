@@ -71,17 +71,17 @@ public abstract class AbstractCrudHandler
      */
     protected int validateIdFromPath(RoutingContext ctx)
     {
-        var idParam = ctx.pathParam("id");
-
-        if (idParam == null)
-        {
-            sendJsonResponse(ctx, 400, new JsonObject().put(ERROR, INVALID_ID_IN_PATH));
-
-            return -1;
-        }
-
         try
         {
+            var idParam = ctx.pathParam("id");
+
+            if (idParam == null)
+            {
+                sendJsonResponse(ctx, 400, new JsonObject().put(ERROR, INVALID_ID_IN_PATH));
+
+                return -1;
+            }
+
             return Integer.parseInt(idParam);
         }
         catch (Exception e)

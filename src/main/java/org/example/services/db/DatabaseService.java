@@ -39,7 +39,6 @@ public interface DatabaseService
     /**
      * Executes a single SQL query using the provided request object.
      * The request should contain necessary fields such as `query` and optionally `params`.
-     *
      * Example request:
      * <pre>
      * {
@@ -56,7 +55,6 @@ public interface DatabaseService
     /**
      * Executes multiple SQL statements as a batch using the provided request object.
      * The request should include a batch query and an array of parameter sets.
-     *
      * Example request:
      * <pre>
      * {

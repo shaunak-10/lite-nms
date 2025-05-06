@@ -44,9 +44,10 @@ public class PluginOperationsUtil
      * @param devices The JSON array of device data
      * @param command The command to execute (reachability or metrics)
      * @return A JSON array with the command results
-     * @throws RuntimeException if the plugin execution fails
+     * @throws Exception if the plugin execution fails
      */
-    private static JsonArray executePlugin(JsonArray devices, String command) throws Exception {
+    private static JsonArray executePlugin(JsonArray devices, String command) throws Exception
+    {
         var timeout = ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT);
 
         Process process = null;
