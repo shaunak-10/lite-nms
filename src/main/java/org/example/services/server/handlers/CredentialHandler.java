@@ -40,13 +40,7 @@ public class CredentialHandler extends AbstractCrudHandler
 
             LOGGER.info("Adding new credential: " + body.encode());
 
-            var name = body.getString(NAME);
-
-            var username = body.getString(USERNAME);
-
-            var password = EncryptionUtil.encrypt(body.getString(PASSWORD));
-
-            executeQuery(ADD_CREDENTIAL, List.of(name, username, password))
+            executeQuery(ADD_CREDENTIAL, List.of(body.getString(NAME), body.getString(USERNAME), EncryptionUtil.encrypt(body.getString(PASSWORD)),body.getString(SYSTEM_TYPE)))
                     .onSuccess(result ->
                     {
                         try
@@ -108,7 +102,8 @@ public class CredentialHandler extends AbstractCrudHandler
                                     credentialList.add(new JsonObject()
                                             .put(ID, row.getInteger(ID))
                                             .put(NAME, row.getString(NAME))
-                                            .put(USERNAME, row.getString(USERNAME)));
+                                            .put(USERNAME, row.getString(USERNAME))
+                                            .put(SYSTEM_TYPE_RESPONSE, row.getString(SYSTEM_TYPE)));
                                 }
                                 catch (Exception e)
                                 {
@@ -163,7 +158,8 @@ public class CredentialHandler extends AbstractCrudHandler
                                 handleSuccess(ctx, new JsonObject()
                                         .put(ID, row.getInteger(ID))
                                         .put(NAME, row.getString(NAME))
-                                        .put(USERNAME, row.getString(USERNAME)));
+                                        .put(USERNAME, row.getString(USERNAME))
+                                        .put(SYSTEM_TYPE_RESPONSE, row.getString(SYSTEM_TYPE)));
                             }
                         }
                         catch (Exception e)
@@ -290,8 +286,9 @@ public class CredentialHandler extends AbstractCrudHandler
                 return TRUE;
             }
 
-            if (body.getString(NAME) == null || body.getString(USERNAME) == null || body.getString(PASSWORD) == null)
+            if (body.getString(NAME) == null || body.getString(USERNAME) == null || body.getString(PASSWORD) == null || body.getString(SYSTEM_TYPE) == null)
             {
+
                 handleMissingData(ctx, MISSING_FIELDS);
 
                 return TRUE;

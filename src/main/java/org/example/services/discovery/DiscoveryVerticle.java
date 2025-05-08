@@ -24,6 +24,8 @@ import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
+import static org.example.constants.AppConstants.CredentialField.SYSTEM_TYPE_RESPONSE;
+import static org.example.constants.AppConstants.CredentialField.SYSTEM_TYPE;
 import static org.example.constants.AppConstants.JsonKey.*;
 
 /**
@@ -379,15 +381,14 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                             var row = rows.getJsonObject(0);
 
-                            var password = DecryptionUtil.decrypt(row.getString(PASSWORD));
-
                             // Construct device JSON object
                             var device = new JsonObject()
                                     .put(ID, id)
                                     .put(IP, ip)
                                     .put(PORT, port)
                                     .put(USERNAME, row.getString(USERNAME))
-                                    .put(PASSWORD, password);
+                                    .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)))
+                                    .put(SYSTEM_TYPE_RESPONSE, row.getString(SYSTEM_TYPE));
 
                             // Run discovery for the single device
                             startDiscoveryPipeline(new JsonArray().add(device),

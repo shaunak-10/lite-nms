@@ -23,6 +23,8 @@ import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.ProvisionField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
+import static org.example.constants.AppConstants.CredentialField.SYSTEM_TYPE_RESPONSE;
+import static org.example.constants.AppConstants.CredentialField.SYSTEM_TYPE;
 import static org.example.constants.AppConstants.ProvisionQuery.*;
 import static org.example.utils.ConnectivityUtil.CheckType;
 
@@ -99,8 +101,6 @@ public class SchedulerServiceImpl implements SchedulerService
         try
         {
             deviceLastPolledTimes.put(id, System.currentTimeMillis());
-
-            System.out.println("added: " + deviceLastPolledTimes);
 
             LOGGER.info("Added device ID " + id + " to map");
 
@@ -194,8 +194,6 @@ public class SchedulerServiceImpl implements SchedulerService
     {
         LOGGER.info("Running scheduled polling task");
 
-        System.out.println(deviceLastPolledTimes);
-
         // Get eligible devices for polling (last polled > 1 minute ago)
         var eligibleDeviceIds = getEligibleDeviceIds();
 
@@ -210,7 +208,7 @@ public class SchedulerServiceImpl implements SchedulerService
 
         var request = new JsonObject()
                 .put(QUERY, String.format(
-                        "SELECT p.id, p.port, p.ip, c.username, c.password " +
+                        "SELECT p.id, p.port, p.ip, c.username, c.password, c.system_type " +
                                 "FROM provisioned_device p " +
                                 "JOIN credential_profile c ON p.credential_profile_id = c.id " +
                                 "WHERE p.id IN (%s)", IntStream.range(1, eligibleDeviceIds.size() + 1)
@@ -243,7 +241,8 @@ public class SchedulerServiceImpl implements SchedulerService
                                         .put(PORT, row.getInteger(PORT))
                                         .put(IP, row.getString(IP))
                                         .put(USERNAME, row.getString(USERNAME))
-                                        .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)));
+                                        .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)))
+                                        .put(SYSTEM_TYPE_RESPONSE, row.getString(SYSTEM_TYPE));
 
                                 devices.add(device);
                             }

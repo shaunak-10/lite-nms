@@ -18,9 +18,12 @@ import static org.example.constants.AppConstants.AddressesAndPaths.CONFIG_FILE_P
 
 public class MainApp
 {
-    private static final int VERTX_WORKER_POOL_SIZE = 10;
+    static
+    {
+        ConfigLoader.init(CONFIG_FILE_PATH);
+    }
 
-    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(VERTX_WORKER_POOL_SIZE));
+    private static final Vertx vertx = Vertx.vertx(new VertxOptions().setWorkerPoolSize(ConfigLoader.get().getInteger("vertx.worker.pool.size")));
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MainApp.class);
 
@@ -33,8 +36,6 @@ public class MainApp
     {
         try
         {
-            ConfigLoader.init(CONFIG_FILE_PATH);
-
             DatabaseClient.testConnection(dbRes ->
             {
                 try

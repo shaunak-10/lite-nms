@@ -18,6 +18,8 @@ import static org.example.constants.AppConstants.DiscoveryQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.CredentialField.USERNAME;
 import static org.example.constants.AppConstants.CredentialField.PASSWORD;
+import static org.example.constants.AppConstants.CredentialField.SYSTEM_TYPE_RESPONSE;
+import static org.example.constants.AppConstants.CredentialField.SYSTEM_TYPE;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
 
@@ -390,7 +392,8 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                                 .put(PORT, row.getInteger(PORT))
                                                 .put(IP, row.getString(IP))
                                                 .put(USERNAME, row.getString(USERNAME))
-                                                .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD))));
+                                                .put(PASSWORD, DecryptionUtil.decrypt(row.getString(PASSWORD)))
+                                                .put(SYSTEM_TYPE_RESPONSE, row.getString(SYSTEM_TYPE)));
 
                                 ctx.vertx().eventBus().send(DiscoveryVerticle.SERVICE_ADDRESS, discoveryData);
 

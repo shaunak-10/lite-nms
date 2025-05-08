@@ -46,8 +46,8 @@ public class DatabaseClient
                                 .setDatabase(dotenv.get("DB_NAME"))
                                 .setUser(dotenv.get("DB_USER"))
                                 .setPassword(dotenv.get("DB_PASSWORD"))
-                                .setConnectTimeout(ConfigLoader.get().getInteger("database.connection.timeout", 5000))
-                                .setIdleTimeout(ConfigLoader.get().getInteger("database.idle.timeout", 300000)))
+                                .setConnectTimeout(ConfigLoader.get().getInteger("database.connection.timeout", 5))
+                                .setIdleTimeout(ConfigLoader.get().getInteger("database.idle.timeout", 300)))
                         .build();
             }
             catch (Exception ex)
@@ -111,7 +111,8 @@ public class DatabaseClient
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) UNIQUE NOT NULL,
                 username VARCHAR(100) NOT NULL,
-                password VARCHAR(100) NOT NULL
+                password VARCHAR(100) NOT NULL,
+                system_type VARCHAR(50) NOT NULL
             );
             """,
                     """

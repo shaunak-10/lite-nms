@@ -8,6 +8,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.example.constants.AppConstants.AddressesAndPaths.PLUGIN_PATH;
 import static org.example.constants.AppConstants.ConfigKeys.PROCESS;
+import static org.example.constants.AppConstants.CredentialField.ID;
+import static org.example.constants.AppConstants.JsonKey.ERROR;
 import static org.example.constants.AppConstants.PingConstants.TIMEOUT;
 
 import io.vertx.core.json.JsonObject;
@@ -77,7 +79,16 @@ public class PluginOperationsUtil
                     {
                         var decrypted = DecryptionUtil.decrypt(line);
 
-                        devicesFromPlugin.add(new JsonObject(decrypted));
+                        var device = new JsonObject(decrypted);
+
+                        if(device.getString(ERROR) != null)
+                        {
+                            LOGGER.error("Plugin error for " + device.getString(ID) + ": " + device.getString(ERROR));
+
+                            continue;
+                        }
+
+                        devicesFromPlugin.add(device);
                     }
                     catch (Exception e)
                     {

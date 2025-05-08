@@ -5,11 +5,11 @@ public class AppConstants
 
     public static class CredentialQuery
     {
-        public static final String ADD_CREDENTIAL = "INSERT INTO credential_profile (name, username, password) VALUES ($1, $2, $3) RETURNING id";
+        public static final String ADD_CREDENTIAL = "INSERT INTO credential_profile (name, username, password, system_type) VALUES ($1, $2, $3, $4) RETURNING id";
 
-        public static final String GET_ALL_CREDENTIALS = "SELECT id, name, username FROM credential_profile ORDER BY id ASC";
+        public static final String GET_ALL_CREDENTIALS = "SELECT id, name, username, system_type FROM credential_profile ORDER BY id ASC";
 
-        public static final String GET_CREDENTIAL_BY_ID = "SELECT * FROM credential_profile WHERE id = $1";
+        public static final String GET_CREDENTIAL_BY_ID = "SELECT id, name, username, system_type FROM credential_profile WHERE id = $1";
 
         public static final String DELETE_CREDENTIAL = "DELETE FROM credential_profile WHERE id = $1";
 
@@ -28,11 +28,11 @@ public class AppConstants
 
         public static final String UPDATE_DISCOVERY = "UPDATE discovery_profile SET name = $1, ip = $2, port = $3, credential_profile_id = $4 WHERE id = $5";
 
-        public static final String DATA_TO_PLUGIN_FOR_DISCOVERY = "SELECT d.id, d.port, d.ip, c.username, c.password FROM discovery_profile d JOIN credential_profile c ON d.credential_profile_id = c.id WHERE d.id = $1";
+        public static final String DATA_TO_PLUGIN_FOR_DISCOVERY = "SELECT d.id, d.port, d.ip, c.username, c.password, c.system_type FROM discovery_profile d JOIN credential_profile c ON d.credential_profile_id = c.id WHERE d.id = $1";
 
         public static final String UPDATE_DISCOVERY_STATUS = "UPDATE discovery_profile SET status = $1 WHERE id = $2";
 
-        public static final String FETCH_CREDENTIAL_FROM_ID = "SELECT username, password FROM credential_profile WHERE id = $1";
+        public static final String FETCH_CREDENTIAL_FROM_ID = "SELECT username, password, system_type FROM credential_profile WHERE id = $1";
     }
 
 
@@ -45,6 +45,10 @@ public class AppConstants
         public static final String USERNAME = "username";
 
         public static final String PASSWORD = "password";
+
+        public static final String SYSTEM_TYPE = "system_type";
+
+        public static final String SYSTEM_TYPE_RESPONSE = "system.type";
     }
 
     public static class DiscoveryField
@@ -204,7 +208,7 @@ public class AppConstants
 
     public static class AddressesAndPaths
     {
-        public static final String PLUGIN_PATH = "/home/shaunak/IdeaProjects/http-server/src/main/java/org/example/plugin_executable/ssh-plugin";
+        public static final String PLUGIN_PATH = "/home/shaunak/IdeaProjects/http-server/src/main/java/org/example/plugin_executable/ssh-plugin-1";
 
         public static final String CONFIG_FILE_PATH = "src/main/resources/config.json";
     }
