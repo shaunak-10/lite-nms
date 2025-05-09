@@ -176,4 +176,22 @@ public class DatabaseClient
         }
 
     }
+
+    /**
+     * Closes the SqlClient, releasing all database connections.
+     * @return A Future that completes when the client is closed.
+     */
+    public static Future<Void> close()
+    {
+        if (client != null)
+        {
+            SqlClient tmpClient = client;
+
+            client = null; // Clear the singleton reference
+
+            return tmpClient.close();
+        }
+
+        return Future.succeededFuture();
+    }
 }

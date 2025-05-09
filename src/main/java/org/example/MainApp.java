@@ -44,7 +44,8 @@ public class MainApp
                     {
                         LOGGER.error("❌ Failed to connect to DB: " + dbRes.cause());
 
-                        vertx.close();
+                        DatabaseClient.close()
+                                .compose(v -> vertx.close());
 
                         return;
                     }
@@ -59,7 +60,8 @@ public class MainApp
                             {
                                 LOGGER.error("❌ Failed to create tables: " + tableRes.cause().getMessage());
 
-                                vertx.close();
+                                DatabaseClient.close()
+                                        .compose(v -> vertx.close());
 
                                 return;
                             }
@@ -72,22 +74,25 @@ public class MainApp
                                     {
                                         LOGGER.error("❌ Failed to deploy verticles: " + err.getMessage());
 
-                                        vertx.close();
+                                        DatabaseClient.close()
+                                                .compose(v -> vertx.close());
                                     });
                         }
                         catch (Exception e)
                         {
                             LOGGER.error("❌ Failed to create tables: " + e.getMessage());
 
-                            vertx.close();
+                            DatabaseClient.close()
+                                    .compose(v -> vertx.close());
                         }
                     });
                 }
                 catch (Exception e)
                 {
-                    LOGGER.error("❌ Failed to load config file: " + e.getMessage());
+                    LOGGER.error(e.getMessage());
 
-                    vertx.close();
+                    DatabaseClient.close()
+                            .compose(v -> vertx.close());
                 }
             });
         }
@@ -95,7 +100,8 @@ public class MainApp
         {
             LOGGER.error(e.getMessage());
 
-            vertx.close();
+            DatabaseClient.close()
+                    .compose(v -> vertx.close());
         }
     }
 
