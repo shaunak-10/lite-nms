@@ -87,6 +87,6 @@ public class HttpServerVerticle extends AbstractVerticle
     @Override
     public void stop()
     {
-        LOGGER.info("HTTP server stopped");
+        LOGGER.info("Stopping HttpVerticle");
     }
 }

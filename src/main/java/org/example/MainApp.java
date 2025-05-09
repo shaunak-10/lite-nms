@@ -94,6 +94,8 @@ public class MainApp
         catch (Exception e)
         {
             LOGGER.error(e.getMessage());
+
+            vertx.close();
         }
     }
 

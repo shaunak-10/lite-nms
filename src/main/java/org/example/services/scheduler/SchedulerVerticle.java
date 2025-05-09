@@ -38,10 +38,8 @@ public class SchedulerVerticle extends AbstractVerticle
     }
 
     @Override
-    public void stop(Promise<Void> stopPromise)
+    public void stop()
     {
         LOGGER.info("Stopping SchedulerVerticle");
-
-        stopPromise.complete();
     }
 }

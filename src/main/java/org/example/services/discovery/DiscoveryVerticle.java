@@ -58,6 +58,12 @@ public class DiscoveryVerticle extends AbstractVerticle
         }
     }
 
+    @Override
+    public void stop()
+    {
+        LOGGER.info("Stopping DiscoveryVerticle");
+    }
+
     /**
      * Handles incoming discovery-related requests from the Event Bus.
      * Supports actions like "startDiscovery" and "fetchDeviceDetailsAndRunDiscovery".
