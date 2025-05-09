@@ -119,7 +119,7 @@ public class DatabaseClient
             CREATE TABLE IF NOT EXISTS discovery_profile (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) UNIQUE NOT NULL,
-                ip VARCHAR(45) UNIQUE NOT NULL,
+                ip VARCHAR(45) NOT NULL,
                 port INTEGER DEFAULT 22,
                 status VARCHAR(50) DEFAULT 'inactive',
                 credential_profile_id INTEGER NOT NULL,
@@ -130,15 +130,16 @@ public class DatabaseClient
             """,
                     """
             CREATE TABLE IF NOT EXISTS provisioned_device (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) UNIQUE NOT NULL,
-                ip VARCHAR(45) NOT NULL,
-                port INTEGER DEFAULT 22,
-                credential_profile_id INTEGER NOT NULL,
-                FOREIGN KEY (credential_profile_id)
-                    REFERENCES credential_profile(id)
-                    ON DELETE RESTRICT
-            );
+                  id SERIAL PRIMARY KEY,
+                  name VARCHAR(100) UNIQUE NOT NULL,
+                  ip VARCHAR(45) UNIQUE NOT NULL,
+                  port INTEGER DEFAULT 22,
+                  credential_profile_id INTEGER NOT NULL,
+                  is_deleted BOOLEAN DEFAULT FALSE,
+                  FOREIGN KEY (credential_profile_id)
+                      REFERENCES credential_profile(id)
+                      ON DELETE RESTRICT
+              );
             """,
                     """
             CREATE TABLE IF NOT EXISTS polling_result (

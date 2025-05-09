@@ -7,10 +7,8 @@ import java.io.*;
 import java.util.concurrent.TimeUnit;
 
 import static org.example.constants.AppConstants.AddressesAndPaths.PLUGIN_PATH;
-import static org.example.constants.AppConstants.ConfigKeys.PROCESS;
 import static org.example.constants.AppConstants.CredentialField.ID;
 import static org.example.constants.AppConstants.JsonKey.ERROR;
-import static org.example.constants.AppConstants.PingConstants.TIMEOUT;
 
 import io.vertx.core.json.JsonObject;
 
@@ -84,8 +82,6 @@ public class PluginOperationsUtil
                         if(device.getString(ERROR) != null)
                         {
                             LOGGER.error("Plugin error for " + device.getString(ID) + ": " + device.getString(ERROR));
-
-                            continue;
                         }
 
                         devicesFromPlugin.add(device);
@@ -97,7 +93,7 @@ public class PluginOperationsUtil
                 }
             }
 
-            var exitCode = process.waitFor(ConfigLoader.get().getJsonObject(PROCESS).getInteger(TIMEOUT), TimeUnit.SECONDS) ? process.exitValue() : -1;
+            var exitCode = process.waitFor(ConfigLoader.get().getInteger("plugin.timeout"), TimeUnit.SECONDS) ? process.exitValue() : -1;
 
             if (exitCode == 0)
             {

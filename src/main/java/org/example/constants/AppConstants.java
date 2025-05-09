@@ -76,13 +76,13 @@ public class AppConstants
     {
         public static final String ADD_PROVISION = "INSERT INTO provisioned_device (name, ip, port, credential_profile_id) VALUES ($1, $2, $3, $4) RETURNING id";
 
+        public static final String RE_PROVISION = "UPDATE provisioned_device SET name = $1, port = $2, credential_profile_id = $3, is_deleted = FALSE WHERE ip = $4 RETURNING id";
+
         public static final String GET_ALL_PROVISIONS = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id GROUP BY pd.id";
 
         public static final String GET_PROVISION_BY_ID = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id WHERE pd.id = $1 GROUP BY pd.id";
 
-        public static final String DELETE_PROVISION = "DELETE FROM provisioned_device WHERE id = $1";
-
-        public static final String DATA_TO_PLUGIN_FOR_POLLING = "SELECT p.id, p.port, p.ip, c.username, c.password FROM provisioned_device p JOIN credential_profile c ON p.credential_profile_id = c.id";
+        public static final String DELETE_PROVISION = "UPDATE provisioned_device SET is_deleted = TRUE WHERE id = $1 AND is_deleted = FALSE";
 
         public static final String INSERT_POLLING_RESULT = "INSERT INTO polling_result (provisioned_device_id, metrics) VALUES ($1, $2::jsonb)";
 
@@ -97,9 +97,13 @@ public class AppConstants
 
         public static final String PORT = "port";
 
+        public static final String IS_DELETED = "is_deleted";
+
         public static final String DISCOVERY_PROFILE_ID = "discovery_profile_id";
 
         public static final String AVAILABILITY_PERCENT_RESPONSE = "availability.percent";
+
+        public static final String IS_POLLING = "is.polling";
 
         public static final String AVAILABILITY_PERCENT = "availability_percent";
 
@@ -208,7 +212,7 @@ public class AppConstants
 
     public static class AddressesAndPaths
     {
-        public static final String PLUGIN_PATH = "/home/shaunak/IdeaProjects/http-server/src/main/java/org/example/plugin_executable/ssh-plugin-1";
+        public static final String PLUGIN_PATH = "/home/shaunak/IdeaProjects/http-server/src/main/java/org/example/plugin_executable/ssh-plugin-final";
 
         public static final String CONFIG_FILE_PATH = "src/main/resources/config.json";
     }

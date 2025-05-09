@@ -45,4 +45,12 @@ public class DatabaseVerticle extends AbstractVerticle
             startPromise.fail(e);
         }
     }
+
+    @Override
+    public void stop(Promise<Void> stopPromise)
+    {
+        LOGGER.info("Stopping DatabaseVerticle");
+
+        stopPromise.complete();
+    }
 }

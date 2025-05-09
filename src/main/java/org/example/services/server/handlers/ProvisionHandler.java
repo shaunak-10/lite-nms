@@ -15,6 +15,8 @@ import static org.example.constants.AppConstants.ProvisionField.AVAILABILITY_PER
 import static org.example.constants.AppConstants.ProvisionField.POLLING_RESULTS_RESPONSE;
 import static org.example.constants.AppConstants.ProvisionField.POLLING_RESULTS;
 import static org.example.constants.AppConstants.ProvisionField.DISCOVERY_PROFILE_ID;
+import static org.example.constants.AppConstants.ProvisionField.IS_DELETED;
+import static org.example.constants.AppConstants.ProvisionField.IS_POLLING;
 import static org.example.constants.AppConstants.ProvisionQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.JsonKey.*;
@@ -90,39 +92,43 @@ public class ProvisionHandler extends AbstractCrudHandler
 
                             LOGGER.info("Inserting provisioned device copied from discovery profile ID: " + discoveryProfileId);
 
-                            executeQuery(ADD_PROVISION, List.of(discoveryProfile.getString(NAME),
-                                    discoveryProfile.getString(IP),
-                                    discoveryProfile.getInteger(PORT),
-                                    discoveryProfile.getInteger(CREDENTIAL_PROFILE_ID)))
-                                    .onSuccess(insertResult ->
+                            executeQuery("SELECT id, is_deleted FROM provisioned_device WHERE ip = $1", List.of(discoveryProfile.getString(IP)))
+                                    .onSuccess(checkDevice ->
                                     {
                                         try
                                         {
-                                            var insertRows = insertResult.getJsonArray(ROWS);
-
-                                            if (insertRows != null && !insertRows.isEmpty())
+                                            if(checkDevice.getInteger(ROW_COUNT)==0)
                                             {
-                                                var id = insertRows.getJsonObject(0).getInteger(ID);
-
-                                                LOGGER.info("Provisioned device added with ID: " + id);
-
-                                                schedulerService.addEntry(id);
-
-                                                handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
+                                                executeQuery(ADD_PROVISION, List.of(discoveryProfile.getString(NAME),
+                                                        discoveryProfile.getString(IP),
+                                                        discoveryProfile.getInteger(PORT),
+                                                        discoveryProfile.getInteger(CREDENTIAL_PROFILE_ID)))
+                                                        .onSuccess(insertResult ->
+                                                                databaseAddSuccess(ctx, insertResult))
+                                                        .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
+                                            }
+                                            else if(!checkDevice.getJsonArray(ROWS).getJsonObject(0).getBoolean(IS_DELETED))
+                                            {
+                                                handleInvalidOperation(ctx,"Device already provisioned");
                                             }
                                             else
                                             {
-                                                LOGGER.error("Insert succeeded but no ID returned.");
-
-                                                handleMissingData(ctx,"Insert succeeded but no ID returned.");
+                                                executeQuery(RE_PROVISION, List.of(discoveryProfile.getString(NAME),
+                                                        discoveryProfile.getInteger(PORT),
+                                                        discoveryProfile.getInteger(CREDENTIAL_PROFILE_ID),
+                                                        discoveryProfile.getString(IP)))
+                                                        .onSuccess(insertResult ->
+                                                                databaseAddSuccess(ctx, insertResult))
+                                                        .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
                                             }
                                         }
                                         catch (Exception e)
                                         {
                                             LOGGER.error("Error while processing result: " + e.getMessage());
                                         }
-                                    })
-                                    .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
+                                    });
+
+
                         }
                         catch (Exception e)
                         {
@@ -166,6 +172,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                                             .put(NAME, row.getString(NAME))
                                             .put(IP, row.getString(IP))
                                             .put(PORT, row.getInteger(PORT))
+                                            .put(IS_POLLING, !row.getBoolean(IS_DELETED))
                                             .put(CREDENTIAL_PROFILE_ID_RESPONSE, row.getInteger(CREDENTIAL_PROFILE_ID))
                                             .put(AVAILABILITY_PERCENT_RESPONSE, row.getDouble(AVAILABILITY_PERCENT, 0.0))
                                             .put(POLLING_RESULTS_RESPONSE, row.getJsonArray(POLLING_RESULTS, new JsonArray()));
@@ -227,6 +234,7 @@ public class ProvisionHandler extends AbstractCrudHandler
                                         .put(NAME, row.getString(NAME))
                                         .put(IP, row.getString(IP))
                                         .put(PORT, row.getInteger(PORT))
+                                        .put(IS_POLLING, !row.getBoolean(IS_DELETED))
                                         .put(CREDENTIAL_PROFILE_ID_RESPONSE, row.getInteger(CREDENTIAL_PROFILE_ID))
                                         .put(AVAILABILITY_PERCENT_RESPONSE, row.getDouble(AVAILABILITY_PERCENT, 0.0))
                                         .put(POLLING_RESULTS_RESPONSE, row.getJsonArray(POLLING_RESULTS, new JsonArray()));
@@ -295,6 +303,35 @@ public class ProvisionHandler extends AbstractCrudHandler
         catch (Exception e)
         {
             LOGGER.error("Error while deleting provisioned device: " + e.getMessage());
+        }
+    }
+
+    private void databaseAddSuccess(RoutingContext ctx, JsonObject insertResult)
+    {
+        try
+        {
+            var insertRows = insertResult.getJsonArray(ROWS);
+
+            if (insertRows != null && !insertRows.isEmpty())
+            {
+                var id = insertRows.getJsonObject(0).getInteger(ID);
+
+                LOGGER.info("Provisioned device added with ID: " + id);
+
+                schedulerService.addEntry(id);
+
+                handleCreated(ctx, new JsonObject().put(MESSAGE, ADDED_SUCCESS).put(ID, id));
+            }
+            else
+            {
+                LOGGER.error("Insert succeeded but no ID returned.");
+
+                handleMissingData(ctx,"Insert succeeded but no ID returned.");
+            }
+        }
+        catch (Exception e)
+        {
+            LOGGER.error("Error while processing result: " + e.getMessage());
         }
     }
 }

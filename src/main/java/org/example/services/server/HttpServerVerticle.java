@@ -83,4 +83,10 @@ public class HttpServerVerticle extends AbstractVerticle
             startPromise.fail(e);
         }
     }
+
+    @Override
+    public void stop()
+    {
+        LOGGER.info("HTTP server stopped");
+    }
 }

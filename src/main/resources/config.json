@@ -1,18 +1,19 @@
 {
   "ping": {
     "count": 3,
-    "timeout": 2,
+    "timeout": 1,
     "interval": 0.5
   },
   "port": {
     "timeout": 1
   },
   "process": {
-    "timeout": 4
+    "timeout": 3
   },
+  "plugin.timeout": 1,
   "scheduler.interval": 10000,
   "polling.interval": 30000,
-  "ip.resolution.timeout": 2000,
+  "ip.resolution.timeout": 500,
   "database.connection.timeout": 5,
   "database.idle.timeout": 300,
   "database.pool.size": 5,

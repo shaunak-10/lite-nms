@@ -49,7 +49,7 @@ public class SchedulerServiceImpl implements SchedulerService
     private static final Map<Integer, Long> deviceLastPolledTimes = new HashMap<>();
 
     // New query to fetch all device IDs from provisioned_device table
-    public static final String GET_ALL_DEVICE_IDS = "SELECT id FROM provisioned_device";
+    public static final String GET_ALL_DEVICE_IDS = "SELECT id FROM provisioned_device WHERE is_deleted = false";
 
     public SchedulerServiceImpl(Vertx vertx)
     {
