@@ -165,7 +165,7 @@ public class AppConstants
 
         public static final String INVALID_JSON_BODY = "Invalid or missing JSON body";
 
-        public static final String MISSING_FIELDS = "Missing required fields";
+        public static final String MISSING_FIELDS = "Required fields are Missing / Invalid";
 
         public static final String NO_DATA_TO_UPDATE = "No data provided for update";
 

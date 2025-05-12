@@ -12,6 +12,7 @@ import org.example.services.db.DatabaseVerticle;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.example.constants.AppConstants.DiscoveryField.ID;
 import static org.example.constants.AppConstants.DiscoveryField.PORT;
@@ -180,7 +181,11 @@ public abstract class AbstractCrudHandler
 
                     var credentialProfileId = getIntegerValue(body, CREDENTIAL_PROFILE_ID);
 
-                    if (discoveryName == null || ip == null)
+                    Pattern ipv4Pattern = Pattern.compile(
+                            "^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$"
+                    );
+
+                    if (discoveryName == null || ip == null || (ip.matches("^[0-9.]+$") && !ipv4Pattern.matcher(ip).matches()))
                     {
                         handleMissingData(ctx, MISSING_FIELDS);
 
