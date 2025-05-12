@@ -86,9 +86,9 @@ public class PluginOperationsUtil
 
                         devicesFromPlugin.add(device);
                     }
-                    catch (Exception e)
+                    catch (Exception exception)
                     {
-                        LOGGER.error("Decryption failed for plugin output: " + e.getMessage());
+                        LOGGER.error("Decryption failed for plugin output: " + exception.getMessage());
                     }
                 }
             }
@@ -120,11 +120,11 @@ public class PluginOperationsUtil
                 throw new Exception(errorMsg);
             }
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Plugin execution error: " + e.getMessage());
+            LOGGER.error("Plugin execution error: " + exception.getMessage());
 
-            throw new Exception(e);
+            throw new Exception(exception);
         }
         finally
         {

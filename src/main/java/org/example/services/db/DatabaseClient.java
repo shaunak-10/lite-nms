@@ -50,9 +50,9 @@ public class DatabaseClient
                                 .setIdleTimeout(ConfigLoader.get().getInteger("database.idle.timeout", 300)))
                         .build();
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                LOGGER.error(ex.getMessage());
+                LOGGER.error(exception.getMessage());
             }
         }
 
@@ -86,9 +86,9 @@ public class DatabaseClient
                 });
             }
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            resultHandler.handle(Future.failedFuture(e));
+            resultHandler.handle(Future.failedFuture(exception));
         }
     }
 
@@ -170,9 +170,9 @@ public class DatabaseClient
 
             future.onComplete(resultHandler);
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error(e.getMessage());
+            LOGGER.error(exception.getMessage());
         }
 
     }
@@ -185,11 +185,7 @@ public class DatabaseClient
     {
         if (client != null)
         {
-            SqlClient tmpClient = client;
-
-            client = null; // Clear the singleton reference
-
-            return tmpClient.close();
+            client.close();
         }
 
         return Future.succeededFuture();

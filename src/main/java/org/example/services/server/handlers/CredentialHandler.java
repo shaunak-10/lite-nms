@@ -62,17 +62,17 @@ public class CredentialHandler extends AbstractCrudHandler
                                 handleMissingData(ctx,"Insert succeeded but no ID returned.");
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
 
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while adding credential: " + e.getMessage());
+            LOGGER.error("Error while adding credential: " + exception.getMessage());
         }
 
     }
@@ -105,9 +105,9 @@ public class CredentialHandler extends AbstractCrudHandler
                                             .put(USERNAME, row.getString(USERNAME))
                                             .put(SYSTEM_TYPE_RESPONSE, row.getString(SYSTEM_TYPE)));
                                 }
-                                catch (Exception e)
+                                catch (Exception exception)
                                 {
-                                    LOGGER.error("Failed to process row: " + e.getMessage());
+                                    LOGGER.error("Failed to process row: " + exception.getMessage());
                                 }
                             }
 
@@ -115,16 +115,16 @@ public class CredentialHandler extends AbstractCrudHandler
 
                             handleSuccess(ctx, new JsonObject().put(CREDENTIALS, credentialList));
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while fetching credentials: " + e.getMessage());
+            LOGGER.error("Error while fetching credentials: " + exception.getMessage());
         }
 
     }
@@ -162,16 +162,16 @@ public class CredentialHandler extends AbstractCrudHandler
                                         .put(SYSTEM_TYPE_RESPONSE, row.getString(SYSTEM_TYPE)));
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while fetching credential by ID: " + e.getMessage());
+            LOGGER.error("Error while fetching credential by ID: " + exception.getMessage());
         }
     }
 
@@ -210,16 +210,16 @@ public class CredentialHandler extends AbstractCrudHandler
                                 handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_UPDATE, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while updating credential: " + e.getMessage());
+            LOGGER.error("Error while updating credential: " + exception.getMessage());
         }
     }
 
@@ -252,17 +252,17 @@ public class CredentialHandler extends AbstractCrudHandler
                                 handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
 
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while deleting credential: " + e.getMessage());
+            LOGGER.error("Error while deleting credential: " + exception.getMessage());
         }
     }
 
@@ -296,9 +296,9 @@ public class CredentialHandler extends AbstractCrudHandler
 
             return FALSE;
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while validating credential fields: " + e.getMessage());
+            LOGGER.error("Error while validating credential fields: " + exception.getMessage());
 
             return TRUE;
         }

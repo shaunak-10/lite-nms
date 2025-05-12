@@ -38,72 +38,100 @@ public class DatabaseServiceImpl implements DatabaseService
         }
         else
         {
-            var query = request.getString(QUERY);
-
-            LOGGER.trace("Executing query: " + query);
-
-            if (request.containsKey(PARAMS))
+            try
             {
-                var paramsArray = request.getJsonArray(PARAMS);
+                var query = request.getString(QUERY);
 
-                var params = Tuple.tuple();
+                LOGGER.trace("Executing query: " + query);
 
-                for (var param : paramsArray)
+                if (request.containsKey(PARAMS))
                 {
-                    params.addValue(param);
-                }
+                    var paramsArray = request.getJsonArray(PARAMS);
 
-                return dbClient.preparedQuery(query)
-                        .execute(params)
-                        .map(this::processQueryResult)
-                        .recover(this::handleQueryError);
+                    var params = Tuple.tuple();
+
+                    for (var param : paramsArray)
+                    {
+                        params.addValue(param);
+                    }
+
+                    return dbClient.preparedQuery(query)
+                            .execute(params)
+                            .map(this::processQueryResult)
+                            .recover(this::handleQueryError);
+                }
+                else
+                {
+                    return dbClient.preparedQuery(query)
+                            .execute()
+                            .map(this::processQueryResult)
+                            .recover(this::handleQueryError);
+                }
             }
-            else
+            catch (Exception exception)
             {
-                return dbClient.preparedQuery(query)
-                        .execute()
-                        .map(this::processQueryResult)
-                        .recover(this::handleQueryError);
+                LOGGER.error("Error executing query: " + exception.getMessage());
+
+                return Future.failedFuture(
+                        String.valueOf(new JsonObject()
+                                .put(SUCCESS, FALSE)
+                                .put(ERROR, exception.getMessage()))
+                );
             }
+
         }
     }
 
     @Override
     public Future<JsonObject> executeBatch(JsonObject request)
     {
-        var query = request.getString(QUERY);
-
-        var paramsArray = request.getJsonArray(PARAMS);
-
-        if (paramsArray == null || paramsArray.isEmpty())
+        try
         {
+            var query = request.getString(QUERY);
+
+            var paramsArray = request.getJsonArray(PARAMS);
+
+            if (paramsArray == null || paramsArray.isEmpty())
+            {
+                return Future.failedFuture(
+                        String.valueOf(new JsonObject()
+                                .put(SUCCESS, FALSE)
+                                .put(ERROR, "No parameters provided"))
+                );
+            }
+
+            List<Tuple> batchParams = new ArrayList<>();
+
+            for (var param : paramsArray)
+            {
+                var paramArray = (JsonArray) param;
+
+                var tuple = Tuple.tuple();
+
+                for (var value : paramArray)
+                {
+                    tuple.addValue(value);
+                }
+
+                batchParams.add(tuple);
+            }
+
+            return dbClient.preparedQuery(query)
+                    .executeBatch(batchParams)
+                    .map(this::processQueryResult)
+                    .recover(this::handleQueryError);
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Error executing batch query: " + exception.getMessage());
+
             return Future.failedFuture(
                     String.valueOf(new JsonObject()
                             .put(SUCCESS, FALSE)
-                            .put(ERROR, "No parameters provided"))
+                            .put(ERROR, exception.getMessage()))
             );
         }
 
-        List<Tuple> batchParams = new ArrayList<>();
-
-        for (var param : paramsArray)
-        {
-            var paramArray = (JsonArray) param;
-
-            var tuple = Tuple.tuple();
-
-            for (var value : paramArray)
-            {
-                tuple.addValue(value);
-            }
-
-            batchParams.add(tuple);
-        }
-
-        return dbClient.preparedQuery(query)
-                .executeBatch(batchParams)
-                .map(this::processQueryResult)
-                .recover(this::handleQueryError);
     }
 
     /**
@@ -141,18 +169,18 @@ public class DatabaseServiceImpl implements DatabaseService
 
                         jsonRow.put(columnName, value);
                     }
-                    catch (Exception e)
+                    catch (Exception exception)
                     {
-                        LOGGER.error(e.getMessage());
+                        LOGGER.error(exception.getMessage());
                     }
 
                 }
 
                 rows.add(jsonRow);
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                LOGGER.error(e.getMessage());
+                LOGGER.error(exception.getMessage());
             }
         }
 

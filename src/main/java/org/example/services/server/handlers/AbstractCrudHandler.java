@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.example.constants.AppConstants.DiscoveryField.ID;
+import static org.example.constants.AppConstants.FALSE;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
 import static org.example.constants.AppConstants.Headers.*;
@@ -85,7 +86,7 @@ public abstract class AbstractCrudHandler
 
             return Integer.parseInt(idParam);
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
             sendJsonResponse(ctx, 400, new JsonObject().put(ERROR, INVALID_ID_IN_PATH));
 
@@ -155,9 +156,9 @@ public abstract class AbstractCrudHandler
                     .putHeader(CONTENT_TYPE, APPLICATION_JSON)
                     .end(body.encodePrettily());
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to send JSON response: " + e.getMessage());
+            LOGGER.error("Failed to send JSON response: " + exception.getMessage());
         }
     }
 
@@ -170,15 +171,29 @@ public abstract class AbstractCrudHandler
      */
     Future<JsonObject> executeQuery(String query, List<Object> params)
     {
-        var request = new JsonObject()
-                .put(QUERY, query);
-
-        if (params != null && !params.isEmpty())
+        try
         {
-            request.put(PARAMS, new JsonArray(params));
+            var request = new JsonObject()
+                    .put(QUERY, query);
+
+            if (params != null && !params.isEmpty())
+            {
+                request.put(PARAMS, new JsonArray(params));
+            }
+
+            return databaseService.executeQuery(request);
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Failed to execute query: " + exception.getMessage());
+
+            return Future.failedFuture(
+                    String.valueOf(new JsonObject()
+                            .put(SUCCESS, FALSE)
+                            .put(ERROR, exception.getMessage()))
+            );
         }
 
-        return databaseService.executeQuery(request);
     }
 
     /**

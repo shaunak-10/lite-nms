@@ -25,7 +25,7 @@ public class IpResolutionUtil {
             return inetAddress.getHostAddress();
 
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
             return null;
         }

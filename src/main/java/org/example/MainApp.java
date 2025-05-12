@@ -78,27 +78,27 @@ public class MainApp
                                                 .compose(v -> vertx.close());
                                     });
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("❌ Failed to create tables: " + e.getMessage());
+                            LOGGER.error("❌ Failed to create tables: " + exception.getMessage());
 
                             DatabaseClient.close()
                                     .compose(v -> vertx.close());
                         }
                     });
                 }
-                catch (Exception e)
+                catch (Exception exception)
                 {
-                    LOGGER.error(e.getMessage());
+                    LOGGER.error(exception.getMessage());
 
                     DatabaseClient.close()
                             .compose(v -> vertx.close());
                 }
             });
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error(e.getMessage());
+            LOGGER.error(exception.getMessage());
 
             DatabaseClient.close()
                     .compose(v -> vertx.close());
@@ -107,24 +107,32 @@ public class MainApp
 
     private static Future<Object> deployAllVerticles()
     {
-        var verticles = List.of(
-                DatabaseVerticle.class,
-                SchedulerVerticle.class,
-                DiscoveryVerticle.class,
-                HttpServerVerticle.class
-        );
-
-        var chain = Future.succeededFuture();
-
-        for (var verticle : verticles)
+        try
         {
-            chain = chain.compose(ignored ->
-                    MainApp.vertx.deployVerticle(verticle.getName())
-                            .onSuccess(id ->
-                                    LOGGER.info("✅ Deployed: " + verticle.getSimpleName()))
-                            .mapEmpty()
+            var verticles = List.of(
+                    DatabaseVerticle.class,
+                    SchedulerVerticle.class,
+                    DiscoveryVerticle.class,
+                    HttpServerVerticle.class
             );
+
+            var chain = Future.succeededFuture();
+
+            for (var verticle : verticles)
+            {
+                chain = chain.compose(ignored ->
+                        MainApp.vertx.deployVerticle(verticle.getName())
+                                .onSuccess(id ->
+                                        LOGGER.info("✅ Deployed: " + verticle.getSimpleName()))
+                                .mapEmpty()
+                );
+            }
+            return chain;
         }
-        return chain;
+        catch (Exception exception)
+        {
+            return Future.failedFuture(exception);
+        }
+
     }
 }

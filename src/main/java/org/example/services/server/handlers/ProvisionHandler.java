@@ -122,25 +122,25 @@ public class ProvisionHandler extends AbstractCrudHandler
                                                         .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
                                             }
                                         }
-                                        catch (Exception e)
+                                        catch (Exception exception)
                                         {
-                                            LOGGER.error("Error while processing result: " + e.getMessage());
+                                            LOGGER.error("Error while processing result: " + exception.getMessage());
                                         }
                                     });
 
 
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
 
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while adding provisioned device: " + e.getMessage());
+            LOGGER.error("Error while adding provisioned device: " + exception.getMessage());
         }
 
     }
@@ -179,9 +179,9 @@ public class ProvisionHandler extends AbstractCrudHandler
 
                                     provisionList.add(provision);
                                 }
-                                catch (Exception e)
+                                catch (Exception exception)
                                 {
-                                    LOGGER.error("Failed to process provisioned device: " + e.getMessage());
+                                    LOGGER.error("Failed to process provisioned device: " + exception.getMessage());
                                 }
                             }
 
@@ -189,16 +189,16 @@ public class ProvisionHandler extends AbstractCrudHandler
 
                             handleSuccess(ctx, new JsonObject().put("provisions", provisionList));
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while fetching provisioned devices: " + e.getMessage());
+            LOGGER.error("Error while fetching provisioned devices: " + exception.getMessage());
         }
 
     }
@@ -242,16 +242,16 @@ public class ProvisionHandler extends AbstractCrudHandler
                                 handleSuccess(ctx, provision);
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while fetching provisioned device by ID: " + e.getMessage());
+            LOGGER.error("Error while fetching provisioned device by ID: " + exception.getMessage());
         }
 
     }
@@ -293,16 +293,16 @@ public class ProvisionHandler extends AbstractCrudHandler
                                 handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while deleting provisioned device: " + e.getMessage());
+            LOGGER.error("Error while deleting provisioned device: " + exception.getMessage());
         }
     }
 
@@ -329,9 +329,9 @@ public class ProvisionHandler extends AbstractCrudHandler
                 handleMissingData(ctx,"Insert succeeded but no ID returned.");
             }
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while processing result: " + e.getMessage());
+            LOGGER.error("Error while processing result: " + exception.getMessage());
         }
     }
 }

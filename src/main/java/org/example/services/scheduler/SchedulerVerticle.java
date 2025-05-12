@@ -29,11 +29,11 @@ public class SchedulerVerticle extends AbstractVerticle
 
             startPromise.complete();
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error(e.getMessage());
+            LOGGER.error(exception.getMessage());
 
-            startPromise.fail(e);
+            startPromise.fail(exception);
         }
     }
 

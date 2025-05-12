@@ -81,9 +81,9 @@ public class ConnectivityUtil
                         reachableDevices.add(device);
                     }
                 }
-                catch (Exception e)
+                catch (Exception exception)
                 {
-                    LOGGER.error(e.getMessage());
+                    LOGGER.error(exception.getMessage());
                 }
                 finally
                 {
@@ -93,9 +93,9 @@ public class ConnectivityUtil
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                LOGGER.error(e.getMessage());
+                LOGGER.error(exception.getMessage());
             }
         }
 

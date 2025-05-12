@@ -50,11 +50,11 @@ public class DiscoveryVerticle extends AbstractVerticle
 
             startPromise.complete();
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to start Discovery Verticle: " + e.getMessage());
+            LOGGER.error("Failed to start Discovery Verticle: " + exception.getMessage());
 
-            startPromise.fail(e);
+            startPromise.fail(exception);
         }
     }
 
@@ -111,9 +111,9 @@ public class DiscoveryVerticle extends AbstractVerticle
                     LOGGER.warn("Unknown action: " + action);
             }
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to handle discovery requests: " + e.getMessage());
+            LOGGER.error("Failed to handle discovery requests: " + exception.getMessage());
         }
     }
 
@@ -158,9 +158,9 @@ public class DiscoveryVerticle extends AbstractVerticle
                                     // Return the device that passed both checks
                                     return portResult.getJsonObject(0);
                                 }
-                                catch (Exception e)
+                                catch (Exception exception)
                                 {
-                                    LOGGER.error("Error processing device ID " + device.getInteger(ID) + ": " + e.getMessage());
+                                    LOGGER.error("Error processing device ID " + device.getInteger(ID) + ": " + exception.getMessage());
 
                                     return null;
                                 }
@@ -202,9 +202,9 @@ public class DiscoveryVerticle extends AbstractVerticle
                                         {
                                             return PluginOperationsUtil.runSSHReachability(reachableDevices);
                                         }
-                                        catch (Exception e)
+                                        catch (Exception exception)
                                         {
-                                            LOGGER.error("SSH reachability check failed: " + e.getMessage());
+                                            LOGGER.error("SSH reachability check failed: " + exception.getMessage());
 
                                             return new JsonArray();
                                         }
@@ -212,11 +212,11 @@ public class DiscoveryVerticle extends AbstractVerticle
                                     FALSE
                             );
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error during discovery pipeline: " + e.getMessage());
+                            LOGGER.error("Error during discovery pipeline: " + exception.getMessage());
 
-                            return Future.failedFuture(e);
+                            return Future.failedFuture(exception);
                         }
                     })
                     .onSuccess(sshResults -> {
@@ -237,9 +237,9 @@ public class DiscoveryVerticle extends AbstractVerticle
                                                 .put(ID, defaultResult.getInteger(ID))
                                                 .put(REACHABLE, FALSE));
                                     }
-                                    catch (Exception e)
+                                    catch (Exception exception)
                                     {
-                                        LOGGER.error("Error processing default result: " + e.getMessage());
+                                        LOGGER.error("Error processing default result: " + exception.getMessage());
                                     }
                                 }
                             }
@@ -256,9 +256,9 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                                         sshResultMap.put(sshResult.getInteger(ID), sshResult.getBoolean(REACHABLE));
                                     }
-                                    catch (Exception e)
+                                    catch (Exception exception)
                                     {
-                                        LOGGER.error("Error processing SSH result: " + e.getMessage());
+                                        LOGGER.error("Error processing SSH result: " + exception.getMessage());
                                     }
                                 }
 
@@ -275,9 +275,9 @@ public class DiscoveryVerticle extends AbstractVerticle
                                                 .put(ID, id)
                                                 .put(REACHABLE, sshResultMap.getOrDefault(id, FALSE)));
                                     }
-                                    catch (Exception e)
+                                    catch (Exception exception)
                                     {
-                                        LOGGER.error("Error processing default result: " + e.getMessage());
+                                        LOGGER.error("Error processing default result: " + exception.getMessage());
                                     }
                                 }
                             }
@@ -286,9 +286,9 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                             updateDiscoveryStatus(updatedResults);
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing discovery results: " + e.getMessage());
+                            LOGGER.error("Error while processing discovery results: " + exception.getMessage());
 
                             updateDiscoveryStatus(defaultResults);
                         }
@@ -300,9 +300,9 @@ public class DiscoveryVerticle extends AbstractVerticle
                         updateDiscoveryStatus(defaultResults);
                     });
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error starting discovery pipeline: " + e.getMessage());
+            LOGGER.error("Error starting discovery pipeline: " + exception.getMessage());
 
             // Fallback to default results if any error occurs
             updateDiscoveryStatus(defaultResults);
@@ -339,11 +339,11 @@ public class DiscoveryVerticle extends AbstractVerticle
                                     .onSuccess(res -> LOGGER.info("Discovery status updated for device ID: " + id))
                                     .onFailure(err -> LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage()));
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while updating discovery status for device ID " + result.getInteger(ID) + ": " + e.getMessage());
+                            LOGGER.error("Error while updating discovery status for device ID " + result.getInteger(ID) + ": " + exception.getMessage());
 
-                            return Future.failedFuture(e);
+                            return Future.failedFuture(exception);
                         }
                     })
                     .collect(Collectors.toList());
@@ -352,9 +352,9 @@ public class DiscoveryVerticle extends AbstractVerticle
             Future.all(updateFutures)
                     .onFailure(err -> LOGGER.error("Failed to update some discovery statuses: " + err.getMessage()));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error updating discovery status: " + e.getMessage());
+            LOGGER.error("Error updating discovery status: " + exception.getMessage());
         }
     }
 
@@ -402,16 +402,16 @@ public class DiscoveryVerticle extends AbstractVerticle
                                             .put(ID, id)
                                             .put(REACHABLE, FALSE)));
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> LOGGER.error("Failed to fetch credentials for device ID " + id + ": " + cause.getMessage()));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to fetch device details and run discovery: " + e.getMessage());
+            LOGGER.error("Failed to fetch device details and run discovery: " + exception.getMessage());
         }
     }
 
@@ -425,14 +425,23 @@ public class DiscoveryVerticle extends AbstractVerticle
      */
     Future<JsonObject> executeQuery(String query, List<Object> params)
     {
-        var request = new JsonObject()
-                .put(QUERY, query);
-
-        if (params != null && !params.isEmpty())
+        try
         {
-            request.put(PARAMS, new JsonArray(params));
-        }
+            var request = new JsonObject()
+                    .put(QUERY, query);
 
-        return DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS).executeQuery(request);
+            if (params != null && !params.isEmpty())
+            {
+                request.put(PARAMS, new JsonArray(params));
+            }
+
+            return DatabaseService.createProxy(vertx, DatabaseVerticle.SERVICE_ADDRESS).executeQuery(request);
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Error executing query: " + exception.getMessage());
+
+            return Future.failedFuture(exception);
+        }
     }
 }

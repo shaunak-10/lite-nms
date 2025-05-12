@@ -68,19 +68,19 @@ public class HttpServerVerticle extends AbstractVerticle
                                 startPromise.fail(http.cause());
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while starting HTTP server", e);
+                            LOGGER.error("Error while starting HTTP server", exception);
 
-                            startPromise.fail(e);
+                            startPromise.fail(exception);
                         }
                     });
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Fatal error during server initialization", e);
+            LOGGER.error("Fatal error during server initialization", exception);
 
-            startPromise.fail(e);
+            startPromise.fail(exception);
         }
     }
 

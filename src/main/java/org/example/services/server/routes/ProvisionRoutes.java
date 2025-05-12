@@ -44,9 +44,9 @@ public class ProvisionRoutes
 
             router.delete(PROVISION_BY_ID).handler(handler::delete);
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error(e.getMessage());
+            LOGGER.error(exception.getMessage());
         }
     }
 }

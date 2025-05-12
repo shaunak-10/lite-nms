@@ -41,9 +41,9 @@ public class ConfigLoader
 
             config = new JsonObject(content);
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-           LOGGER.error("Failed to load config file: " + e.getMessage());
+           LOGGER.error("Failed to load config file: " + exception.getMessage());
         }
     }
 

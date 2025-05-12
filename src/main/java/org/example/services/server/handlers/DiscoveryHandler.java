@@ -100,16 +100,16 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                                 handleMissingData(ctx, "Insert succeeded but no ID returned.");
                                             }
                                         }
-                                        catch (Exception e)
+                                        catch (Exception exception)
                                         {
-                                            LOGGER.error("Error while processing result: " + e.getMessage());
+                                            LOGGER.error("Error while processing result: " + exception.getMessage());
                                         }
                                     })
                                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_ADD, cause));
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while resolving IP: " + e.getMessage());
+                            LOGGER.error("Error while resolving IP: " + exception.getMessage());
                         }
                     })
                     .onFailure(err ->
@@ -119,9 +119,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
                         handleInvalidData(ctx, INVALID_IP);
                     });
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Invalid input in add(): " + e.getMessage());
+            LOGGER.error("Invalid input in add(): " + exception.getMessage());
         }
     }
 
@@ -155,9 +155,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                             .put(STATUS, row.getString(STATUS))
                                             .put(CREDENTIAL_PROFILE_ID_RESPONSE, row.getInteger(CREDENTIAL_PROFILE_ID)));
                                 }
-                                catch (Exception e)
+                                catch (Exception exception)
                                 {
-                                    LOGGER.error("Error while processing row: " + e.getMessage());
+                                    LOGGER.error("Error while processing row: " + exception.getMessage());
                                 }
                             }
 
@@ -165,16 +165,16 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
                             handleSuccess(ctx, new JsonObject().put(DISCOVERIES, discoveryList));
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while fetching discovery profiles: " + e.getMessage());
+            LOGGER.error("Error while fetching discovery profiles: " + exception.getMessage());
         }
 
     }
@@ -214,16 +214,16 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                         .put(CREDENTIAL_PROFILE_ID_RESPONSE, row.getInteger(CREDENTIAL_PROFILE_ID)));
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while fetching discovery profile: " + e.getMessage());
+            LOGGER.error("Error while fetching discovery profile: " + exception.getMessage());
         }
 
     }
@@ -283,16 +283,16 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                                 handleSuccess(ctx, new JsonObject().put(MESSAGE, UPDATED_SUCCESS));
                                             }
                                         }
-                                        catch (Exception e)
+                                        catch (Exception exception)
                                         {
-                                            LOGGER.error("Error while processing result: " + e.getMessage());
+                                            LOGGER.error("Error while processing result: " + exception.getMessage());
                                         }
                                     })
                                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_UPDATE, cause));
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while resolving IP: " + e.getMessage());
+                            LOGGER.error("Error while resolving IP: " + exception.getMessage());
                         }
                     })
                     .onFailure(err ->
@@ -302,9 +302,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
                         handleInvalidData(ctx, INVALID_IP);
                     });
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Invalid input in update(): " + e.getMessage());
+            LOGGER.error("Invalid input in update(): " + exception.getMessage());
         }
     }
 
@@ -337,16 +337,16 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                 handleSuccess(ctx, new JsonObject().put(MESSAGE, DELETED_SUCCESS));
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Error while processing result: " + e.getMessage());
+                            LOGGER.error("Error while processing result: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_DELETE, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while deleting discovery profile: " + e.getMessage());
+            LOGGER.error("Error while deleting discovery profile: " + exception.getMessage());
         }
 
     }
@@ -400,16 +400,16 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                 handleSuccess(ctx,new JsonObject().put(MESSAGE,"Discovery run successfully started"));
                             }
                         }
-                        catch (Exception e)
+                        catch (Exception exception)
                         {
-                            LOGGER.error("Failed to process device: " + e.getMessage());
+                            LOGGER.error("Failed to process device: " + exception.getMessage());
                         }
                     })
                     .onFailure(cause -> handleDatabaseError(ctx, FAILED_TO_FETCH, cause));
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while running discovery: " + e.getMessage());
+            LOGGER.error("Error while running discovery: " + exception.getMessage());
         }
     }
 
@@ -425,9 +425,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
         {
             return !(port >= 1) || !(port <= 65535);
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Invalid port: " + e.getMessage());
+            LOGGER.error("Invalid port: " + exception.getMessage());
 
             return TRUE;
         }
@@ -469,9 +469,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             return FALSE;
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Error while validating discovery fields: " + e.getMessage());
+            LOGGER.error("Error while validating discovery fields: " + exception.getMessage());
 
             return TRUE;
         }

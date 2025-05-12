@@ -1,7 +1,6 @@
 package org.example.services.scheduler;
 
 import io.vertx.core.Future;
-import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.impl.logging.Logger;
 import io.vertx.core.impl.logging.LoggerFactory;
@@ -87,11 +86,11 @@ public class SchedulerServiceImpl implements SchedulerService
                 return Future.failedFuture("Failed to start polling: " + err.getMessage());
             });
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to start polling: " + e.getMessage());
+            LOGGER.error("Failed to start polling: " + exception.getMessage());
 
-            return Future.failedFuture("Failed to start polling: " + e.getMessage());
+            return Future.failedFuture("Failed to start polling: " + exception.getMessage());
         }
     }
 
@@ -106,11 +105,11 @@ public class SchedulerServiceImpl implements SchedulerService
 
             return Future.succeededFuture();
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to add device ID " + id + ": " + e.getMessage());
+            LOGGER.error("Failed to add device ID " + id + ": " + exception.getMessage());
 
-            return Future.failedFuture(e);
+            return Future.failedFuture(exception);
         }
     }
 
@@ -130,11 +129,11 @@ public class SchedulerServiceImpl implements SchedulerService
 
             return Future.succeededFuture();
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to remove device ID " + id + ": " + e.getMessage());
+            LOGGER.error("Failed to remove device ID " + id + ": " + exception.getMessage());
 
-            return Future.failedFuture(e);
+            return Future.failedFuture(exception);
         }
     }
 
@@ -143,48 +142,57 @@ public class SchedulerServiceImpl implements SchedulerService
      */
     private Future<Void> initializeDeviceMap()
     {
-        var request = new JsonObject()
-                .put(QUERY, GET_ALL_DEVICE_IDS)
-                .put(PARAMS, Collections.emptyList());
+        try
+        {
+            var request = new JsonObject()
+                    .put(QUERY, GET_ALL_DEVICE_IDS)
+                    .put(PARAMS, Collections.emptyList());
 
-        return databaseService.executeQuery(request)
-                .compose(dbResponse ->
-                {
-                    try
+            return databaseService.executeQuery(request)
+                    .compose(dbResponse ->
                     {
-                        if (!dbResponse.getBoolean(SUCCESS))
+                        try
                         {
-                            return Future.failedFuture("DB query failed: " + dbResponse.getString(ERROR));
+                            if (!dbResponse.getBoolean(SUCCESS))
+                            {
+                                return Future.failedFuture("DB query failed: " + dbResponse.getString(ERROR));
+                            }
+
+                            long currentTime = System.currentTimeMillis();
+
+                            for (var rowObj : dbResponse.getJsonArray(ROWS, new JsonArray()))
+                            {
+                                var row = (JsonObject) rowObj;
+                                try
+                                {
+                                    Integer deviceId = row.getInteger(ID);
+
+                                    deviceLastPolledTimes.put(deviceId, currentTime);
+                                }
+                                catch (Exception exception)
+                                {
+                                    LOGGER.error("Failed to process device ID: " + exception.getMessage());
+                                }
+                            }
+
+                            LOGGER.info("Initialized device map with " + deviceLastPolledTimes.size() + " devices");
+
+                            return Future.succeededFuture();
                         }
-
-                        long currentTime = System.currentTimeMillis();
-
-                        for (var rowObj : dbResponse.getJsonArray(ROWS, new JsonArray()))
+                        catch (Exception exception)
                         {
-                            var row = (JsonObject) rowObj;
-                            try
-                            {
-                                Integer deviceId = row.getInteger(ID);
+                            LOGGER.error("Failed to process DB response: " + exception.getMessage());
 
-                                deviceLastPolledTimes.put(deviceId, currentTime);
-                            }
-                            catch (Exception e)
-                            {
-                                LOGGER.error("Failed to process device ID: " + e.getMessage());
-                            }
+                            return Future.failedFuture("Failed to process DB response: " + exception.getMessage());
                         }
+                    });
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Failed to initialize device map: " + exception.getMessage());
 
-                        LOGGER.info("Initialized device map with " + deviceLastPolledTimes.size() + " devices");
-
-                        return Future.succeededFuture();
-                    }
-                    catch (Exception e)
-                    {
-                        LOGGER.error("Failed to process DB response: " + e.getMessage());
-
-                        return Future.failedFuture("Failed to process DB response: " + e.getMessage());
-                    }
-                });
+            return Future.failedFuture("Failed to initialize device map: " + exception.getMessage());
+        }
     }
 
     /**
@@ -246,9 +254,9 @@ public class SchedulerServiceImpl implements SchedulerService
 
                                 devices.add(device);
                             }
-                            catch (Exception e)
+                            catch (Exception exception)
                             {
-                                LOGGER.error("Failed to process device: " + e.getMessage());
+                                LOGGER.error("Failed to process device: " + exception.getMessage());
                             }
                         }
 
@@ -290,9 +298,9 @@ public class SchedulerServiceImpl implements SchedulerService
                                                 return portResult.getJsonObject(0);
 
                                             }
-                                            catch (Exception e)
+                                            catch (Exception exception)
                                             {
-                                                LOGGER.error("Error processing device ID " + device.getInteger(ID) + ": " + e.getMessage());
+                                                LOGGER.error("Error processing device ID " + device.getInteger(ID) + ": " + exception.getMessage());
 
                                                 return null;
                                             }
@@ -319,9 +327,9 @@ public class SchedulerServiceImpl implements SchedulerService
                                                 reachableDevices.add(result);
                                             }
                                         }
-                                        catch (Exception e)
+                                        catch (Exception exception)
                                         {
-                                            LOGGER.error("Error processing result for device ID " + devices.getJsonObject(i).getInteger(ID) + ": " + e.getMessage());
+                                            LOGGER.error("Error processing result for device ID " + devices.getJsonObject(i).getInteger(ID) + ": " + exception.getMessage());
                                         }
                                     }
 
@@ -340,9 +348,9 @@ public class SchedulerServiceImpl implements SchedulerService
 
                                             availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
                                         }
-                                        catch (Exception e)
+                                        catch (Exception exception)
                                         {
-                                            LOGGER.error("Error processing device ID " + devices.getJsonObject(i).getInteger(ID) + ": " + e.getMessage());
+                                            LOGGER.error("Error processing device ID " + devices.getJsonObject(i).getInteger(ID) + ": " + exception.getMessage());
                                         }
                                     }
 
@@ -363,9 +371,9 @@ public class SchedulerServiceImpl implements SchedulerService
                                                 {
                                                     return PluginOperationsUtil.runSSHMetrics(reachableDevices);
                                                 }
-                                                catch (Exception e)
+                                                catch (Exception exception)
                                                 {
-                                                    LOGGER.error("SSH metrics collection failed: " + e.getMessage());
+                                                    LOGGER.error("SSH metrics collection failed: " + exception.getMessage());
 
                                                     return new JsonArray();
                                                 }
@@ -414,9 +422,9 @@ public class SchedulerServiceImpl implements SchedulerService
 
                                                 batchParams.add(List.of(metricResult.getInteger(ID), metrics.encode()));
                                             }
-                                            catch (Exception e)
+                                            catch (Exception exception)
                                             {
-                                                LOGGER.error("Error processing metrics result: " + e.getMessage());
+                                                LOGGER.error("Error processing metrics result: " + exception.getMessage());
                                             }
                                         }
 
@@ -436,9 +444,9 @@ public class SchedulerServiceImpl implements SchedulerService
                                                 })
                                                 .onFailure(err -> LOGGER.error("Batch insert failed: " + err.getMessage()));
                                     }
-                                    catch (Exception e)
+                                    catch (Exception exception)
                                     {
-                                        LOGGER.error("Failed to process metrics results: " + e.getMessage());
+                                        LOGGER.error("Failed to process metrics results: " + exception.getMessage());
                                     }
                                 })
                                 .onFailure(err ->
@@ -456,12 +464,12 @@ public class SchedulerServiceImpl implements SchedulerService
                                                     .put(QUERY, ADD_AVAILABILITY_DATA)
                                                     .put(PARAMS, availabilityParams))
                                             .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
-                                            .onFailure(e -> LOGGER.error("Availability insert failed: " + e.getMessage()));
+                                            .onFailure(exception -> LOGGER.error("Availability insert failed: " + exception.getMessage()));
                                 });
                     }
-                    catch (Exception e)
+                    catch (Exception exception)
                     {
-                        LOGGER.error("Failed to process DB response: " + e.getMessage());
+                        LOGGER.error("Failed to process DB response: " + exception.getMessage());
                     }
                 })
                 .onFailure(err -> LOGGER.error("DB query failed: " + err.getMessage()));
@@ -485,16 +493,16 @@ public class SchedulerServiceImpl implements SchedulerService
                         eligibleDevices.add(entry.getKey());
                     }
                 }
-                catch (Exception e)
+                catch (Exception exception)
                 {
-                    LOGGER.error("Failed to process device ID " + entry.getKey() + ": " + e.getMessage());
+                    LOGGER.error("Failed to process device ID " + entry.getKey() + ": " + exception.getMessage());
                 }
             }
             return eligibleDevices;
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to get eligible device IDs: " + e.getMessage());
+            LOGGER.error("Failed to get eligible device IDs: " + exception.getMessage());
 
             return Collections.emptyList();
         }
@@ -517,15 +525,15 @@ public class SchedulerServiceImpl implements SchedulerService
 
                     deviceLastPolledTimes.put(deviceId, currentTime);
                 }
-                catch (Exception e)
+                catch (Exception exception)
                 {
-                    LOGGER.error("Failed to update last polled time: " + e.getMessage());
+                    LOGGER.error("Failed to update last polled time: " + exception.getMessage());
                 }
             }
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            LOGGER.error("Failed to update last polled times: " + e.getMessage());
+            LOGGER.error("Failed to update last polled times: " + exception.getMessage());
         }
     }
 }

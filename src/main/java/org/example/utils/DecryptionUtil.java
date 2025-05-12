@@ -34,7 +34,7 @@ public class DecryptionUtil
      * The AES key is expected to be provided as a Base64-encoded string via an environment variable.
      * </p>
      *
-     * @param encryptedText The encrypted text, Base64-encoded with IV + ciphertext.
+     * @param encryptedText The encrypted text, Base64-encoded with IV plus ciphertext.
      * @return The decrypted plaintext string.
      * @throws Exception If decryption fails due to invalid input, key, or cipher configuration.
      */

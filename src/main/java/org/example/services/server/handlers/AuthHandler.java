@@ -54,11 +54,19 @@ public class AuthHandler
      */
     public void setupAuth(Router router)
     {
-        setupLoginRoute(router);
+        try
+        {
+            setupLoginRoute(router);
 
-        setupRefreshRoute(router);
+            setupRefreshRoute(router);
 
-        secureRoutes(router);
+            secureRoutes(router);
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Error setting up authentication routes", exception);
+        }
+
     }
 
     /**
@@ -98,9 +106,9 @@ public class AuthHandler
                     ctx.response().setStatusCode(401).end("Invalid credentials");
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                LOGGER.error("Error in login handler", e);
+                LOGGER.error("Error in login handler", exception);
 
                 ctx.response().setStatusCode(500).end("Internal server error");
             }
@@ -148,9 +156,9 @@ public class AuthHandler
                                                 .put("access_token", newAccessToken)
                                                 .encodePrettily());
                             }
-                            catch (Exception e)
+                            catch (Exception exception)
                             {
-                                LOGGER.error("Error generating new access token", e);
+                                LOGGER.error("Error generating new access token", exception);
 
                                 ctx.response().setStatusCode(500).end("Internal server error");
                             }
@@ -159,9 +167,9 @@ public class AuthHandler
                                 .setStatusCode(401)
                                 .end("Invalid or expired refresh token"));
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                LOGGER.error("Error in refresh token handler", e);
+                LOGGER.error("Error in refresh token handler", exception);
 
                 ctx.response().setStatusCode(500).end("Internal server error");
             }
@@ -200,9 +208,9 @@ public class AuthHandler
                     ctx.next();
                 }
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                LOGGER.error("Error in failure handler", e);
+                LOGGER.error("Error in failure handler", exception);
             }
         });
     }
