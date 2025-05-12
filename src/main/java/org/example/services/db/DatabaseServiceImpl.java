@@ -100,7 +100,7 @@ public class DatabaseServiceImpl implements DatabaseService
                 );
             }
 
-            List<Tuple> batchParams = new ArrayList<>();
+            var batchParams = new ArrayList<Tuple>();
 
             for (var param : paramsArray)
             {
@@ -163,11 +163,7 @@ public class DatabaseServiceImpl implements DatabaseService
                 {
                     try
                     {
-                        var columnName = row.getColumnName(i);
-
-                        var value = row.getValue(i);
-
-                        jsonRow.put(columnName, value);
+                        jsonRow.put(row.getColumnName(i), row.getValue(i));
                     }
                     catch (Exception exception)
                     {

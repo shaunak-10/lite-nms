@@ -88,6 +88,8 @@ public abstract class AbstractCrudHandler
         }
         catch (Exception exception)
         {
+            LOGGER.error(exception.getMessage());
+
             sendJsonResponse(ctx, 400, new JsonObject().put(ERROR, INVALID_ID_IN_PATH));
 
             return -1;
