@@ -49,6 +49,8 @@ public class AppConstants
         public static final String SYSTEM_TYPE = "system_type";
 
         public static final String SYSTEM_TYPE_RESPONSE = "system.type";
+
+        public static final String CREDENTIAL = "credential";
     }
 
     public static class DiscoveryField
@@ -70,6 +72,8 @@ public class AppConstants
         public static final String ACTIVE = "active";
 
         public static final String INACTIVE = "inactive";
+
+        public static final String DISCOVERY = "discovery";
     }
 
     public static class ProvisionQuery
@@ -110,6 +114,8 @@ public class AppConstants
         public static final String POLLING_RESULTS_RESPONSE = "polling.results";
 
         public static final String POLLING_RESULTS = "polling_results";
+
+        public static final String PROVISION = "provision";
 
     }
 

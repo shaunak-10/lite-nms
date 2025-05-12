@@ -17,6 +17,7 @@ import static org.example.constants.AppConstants.ProvisionField.POLLING_RESULTS;
 import static org.example.constants.AppConstants.ProvisionField.DISCOVERY_PROFILE_ID;
 import static org.example.constants.AppConstants.ProvisionField.IS_DELETED;
 import static org.example.constants.AppConstants.ProvisionField.IS_POLLING;
+import static org.example.constants.AppConstants.ProvisionField.PROVISION;
 import static org.example.constants.AppConstants.ProvisionQuery.*;
 import static org.example.constants.AppConstants.DiscoveryField.*;
 import static org.example.constants.AppConstants.JsonKey.*;
@@ -49,21 +50,9 @@ public class ProvisionHandler extends AbstractCrudHandler
         {
             var body = ctx.body().asJsonObject();
 
-            if (body == null)
-            {
-                handleMissingData(ctx, INVALID_JSON_BODY);
-
-                return;
-            }
+            if(!isBodyValid(ctx,body,PROVISION)) return;
 
             var discoveryProfileId = body.getInteger(DISCOVERY_PROFILE_ID);
-
-            if (discoveryProfileId == null)
-            {
-                handleMissingData(ctx, MISSING_FIELDS);
-
-                return;
-            }
 
             LOGGER.info("Fetching discovery profile with ID: " + discoveryProfileId);
 

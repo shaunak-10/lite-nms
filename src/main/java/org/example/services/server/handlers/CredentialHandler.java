@@ -11,10 +11,8 @@ import java.util.List;
 
 import static org.example.constants.AppConstants.CredentialQuery.*;
 import static org.example.constants.AppConstants.CredentialField.*;
-import static org.example.constants.AppConstants.FALSE;
 import static org.example.constants.AppConstants.JsonKey.*;
 import static org.example.constants.AppConstants.Message.*;
-import static org.example.constants.AppConstants.TRUE;
 
 public class CredentialHandler extends AbstractCrudHandler
 {
@@ -36,7 +34,7 @@ public class CredentialHandler extends AbstractCrudHandler
         {
             var body = ctx.body().asJsonObject();
 
-            if (notValidateCredentialFields(ctx, body)) return;
+            if(!isBodyValid(ctx,body,CREDENTIAL)) return;
 
             LOGGER.info("Adding new credential: " + body.encode());
 
@@ -186,13 +184,11 @@ public class CredentialHandler extends AbstractCrudHandler
 
             var body = ctx.body().asJsonObject();
 
-            if (notValidateCredentialFields(ctx, body)) return;
-
-            var password = EncryptionUtil.encrypt(body.getString(PASSWORD));
+            if(!isBodyValid(ctx,body,CREDENTIAL)) return;
 
             LOGGER.info("Updating credential ID " + id + " with data: " + body.encode());
 
-            executeQuery(UPDATE_CREDENTIAL, List.of(body.getString(NAME), body.getString(USERNAME), password, id))
+            executeQuery(UPDATE_CREDENTIAL, List.of(body.getString(NAME), body.getString(USERNAME), EncryptionUtil.encrypt(body.getString(PASSWORD)), id))
                     .onSuccess(result ->
                     {
                         try
@@ -263,44 +259,6 @@ public class CredentialHandler extends AbstractCrudHandler
         catch (Exception exception)
         {
             LOGGER.error("Error while deleting credential: " + exception.getMessage());
-        }
-    }
-
-    /**
-     * Validates the credential fields in the request body.
-     * Checks if the body is present and contains the necessary fields: name, username, and password.
-     * If any of the fields are missing or the body is null, an error response is sent to the client.
-     *
-     * @param ctx the RoutingContext containing the request data
-     * @param body the JSON object containing the fields to validate
-     * @return true if validation fails (either due to missing data or invalid fields), false otherwise
-     */
-    private boolean notValidateCredentialFields(RoutingContext ctx, JsonObject body)
-    {
-        try
-        {
-            if (body == null)
-            {
-                handleMissingData(ctx, INVALID_JSON_BODY);
-
-                return TRUE;
-            }
-
-            if (body.getString(NAME) == null || body.getString(USERNAME) == null || body.getString(PASSWORD) == null || body.getString(SYSTEM_TYPE) == null)
-            {
-
-                handleMissingData(ctx, MISSING_FIELDS);
-
-                return TRUE;
-            }
-
-            return FALSE;
-        }
-        catch (Exception exception)
-        {
-            LOGGER.error("Error while validating credential fields: " + exception.getMessage());
-
-            return TRUE;
         }
     }
 }

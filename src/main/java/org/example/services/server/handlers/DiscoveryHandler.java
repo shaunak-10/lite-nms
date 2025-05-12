@@ -43,7 +43,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
         {
             var body = ctx.body().asJsonObject();
 
-            if(notValidateDiscoveryFields(ctx, body)) return;
+            if(!isBodyValid(ctx,body,DISCOVERY)) return;
 
             var port = body.getInteger(PORT, 22);
 
@@ -239,7 +239,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             var body = ctx.body().asJsonObject();
 
-            if(notValidateDiscoveryFields(ctx, body)) return;
+            if(!isBodyValid(ctx,body,DISCOVERY)) return;
 
             LOGGER.info("Updating discovery profile ID " + id + " with data: " + body.encode());
 
