@@ -84,7 +84,7 @@ public class AppConstants
 
         public static final String GET_ALL_PROVISIONS = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id GROUP BY pd.id";
 
-        public static final String GET_PROVISION_BY_ID = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id WHERE pd.id = $1 GROUP BY pd.id";
+        public static final String GET_PROVISION_BY_ID = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id WHERE pd.id = $1 GROUP BY pd.id";
 
         public static final String DELETE_PROVISION = "UPDATE provisioned_device SET is_deleted = TRUE WHERE id = $1 AND is_deleted = FALSE";
 
