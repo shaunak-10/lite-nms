@@ -144,11 +144,9 @@ public class SchedulerServiceImpl implements SchedulerService
     {
         try
         {
-            var request = new JsonObject()
-                    .put(QUERY, GET_ALL_DEVICE_IDS)
-                    .put(PARAMS, Collections.emptyList());
-
-            return databaseService.executeQuery(request)
+            return databaseService.executeQuery(new JsonObject()
+                            .put(QUERY, GET_ALL_DEVICE_IDS)
+                            .put(PARAMS, Collections.emptyList()))
                     .compose(dbResponse ->
                     {
                         try
@@ -158,16 +156,11 @@ public class SchedulerServiceImpl implements SchedulerService
                                 return Future.failedFuture("DB query failed: " + dbResponse.getString(ERROR));
                             }
 
-                            long currentTime = System.currentTimeMillis();
-
                             for (var rowObj : dbResponse.getJsonArray(ROWS, new JsonArray()))
                             {
-                                var row = (JsonObject) rowObj;
                                 try
                                 {
-                                    Integer deviceId = row.getInteger(ID);
-
-                                    deviceLastPolledTimes.put(deviceId, currentTime);
+                                    deviceLastPolledTimes.put(((JsonObject) rowObj).getInteger(ID), System.currentTimeMillis());
                                 }
                                 catch (Exception exception)
                                 {
@@ -214,17 +207,15 @@ public class SchedulerServiceImpl implements SchedulerService
 
         LOGGER.info("Found " + eligibleDeviceIds.size() + " devices eligible for polling");
 
-        var request = new JsonObject()
-                .put(QUERY, String.format(
-                        "SELECT p.id, p.port, p.ip, c.username, c.password, c.system_type " +
-                                "FROM provisioned_device p " +
-                                "JOIN credential_profile c ON p.credential_profile_id = c.id " +
-                                "WHERE p.id IN (%s)", IntStream.range(1, eligibleDeviceIds.size() + 1)
-                                .mapToObj(i -> "$" + i)
-                                .collect(Collectors.joining(","))))
-                .put(PARAMS, new JsonArray(eligibleDeviceIds));
-
-        databaseService.executeQuery(request)
+        databaseService.executeQuery(new JsonObject()
+                        .put(QUERY, String.format(
+                                "SELECT p.id, p.port, p.ip, c.username, c.password, c.system_type " +
+                                        "FROM provisioned_device p " +
+                                        "JOIN credential_profile c ON p.credential_profile_id = c.id " +
+                                        "WHERE p.id IN (%s)", IntStream.range(1, eligibleDeviceIds.size() + 1)
+                                        .mapToObj(i -> "$" + i)
+                                        .collect(Collectors.joining(","))))
+                        .put(PARAMS, new JsonArray(eligibleDeviceIds)))
                 .onSuccess(dbResponse ->
                 {
                     try
@@ -344,9 +335,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                     {
                                         try
                                         {
-                                            var deviceId = devices.getJsonObject(i).getInteger(ID);
-
-                                            availabilityParams.add(List.of(deviceId, reachableIds.contains(deviceId)));
+                                            availabilityParams.add(List.of(devices.getJsonObject(i).getInteger(ID), reachableIds.contains(devices.getJsonObject(i).getInteger(ID))));
                                         }
                                         catch (Exception exception)
                                         {
