@@ -82,13 +82,13 @@ public class AppConstants
 
         public static final String RE_PROVISION = "UPDATE provisioned_device SET name = $1, port = $2, credential_profile_id = $3, is_deleted = FALSE WHERE ip = $4 RETURNING id";
 
-        public static final String GET_ALL_PROVISIONS = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics::json)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id GROUP BY pd.id";
+        public static final String GET_ALL_PROVISIONS = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id GROUP BY pd.id";
 
         public static final String GET_PROVISION_BY_ID = "SELECT pd.*, COALESCE(json_agg(json_build_object('polled.at', pr.polled_at, 'metrics', pr.metrics)) FILTER (WHERE pr.id IS NOT NULL), '[]') AS polling_results, (SELECT ROUND(COUNT(*) FILTER (WHERE was_available)/GREATEST(COUNT(*),1)::decimal * 100, 2) FROM availability a WHERE a.provisioned_device_id = pd.id) AS availability_percent FROM provisioned_device pd LEFT JOIN polling_result pr ON pd.id = pr.provisioned_device_id WHERE pd.id = $1 GROUP BY pd.id";
 
         public static final String DELETE_PROVISION = "UPDATE provisioned_device SET is_deleted = TRUE WHERE id = $1 AND is_deleted = FALSE";
 
-        public static final String INSERT_POLLING_RESULT = "INSERT INTO polling_result (provisioned_device_id, metrics) VALUES ($1, $2::jsonb)";
+        public static final String INSERT_POLLING_RESULT = "INSERT INTO polling_result (provisioned_device_id, metrics) VALUES ($1, $2)";
 
         public static final String ADD_AVAILABILITY_DATA = "INSERT INTO availability (provisioned_device_id, was_available) VALUES ($1, $2)";
     }

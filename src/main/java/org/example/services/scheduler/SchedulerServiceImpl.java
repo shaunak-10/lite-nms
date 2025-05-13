@@ -403,13 +403,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                         {
                                             try
                                             {
-                                                var metricResult = metricsResults.getJsonObject(i);
-
-                                                var metrics = metricResult.copy();
-
-                                                metrics.remove(ID);
-
-                                                batchParams.add(List.of(metricResult.getInteger(ID), metrics.encode()));
+                                                batchParams.add(List.of(metricsResults.getJsonObject(i).getInteger(ID), metricsResults.getJsonObject(i).copy().remove(ID)));
                                             }
                                             catch (Exception exception)
                                             {
@@ -504,15 +498,13 @@ public class SchedulerServiceImpl implements SchedulerService
     {
         try
         {
-            long currentTime = System.currentTimeMillis();
-
             for (int i = 0; i < devices.size(); i++)
             {
                 try
                 {
                     Integer deviceId = devices.getJsonObject(i).getInteger(ID);
 
-                    deviceLastPolledTimes.put(deviceId, currentTime);
+                    deviceLastPolledTimes.put(deviceId, System.currentTimeMillis());
                 }
                 catch (Exception exception)
                 {
