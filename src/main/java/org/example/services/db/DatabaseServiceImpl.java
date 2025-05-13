@@ -11,7 +11,6 @@ import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import static org.example.constants.AppConstants.FALSE;
 import static org.example.constants.AppConstants.JsonKey.*;
@@ -46,11 +45,9 @@ public class DatabaseServiceImpl implements DatabaseService
 
                 if (request.containsKey(PARAMS))
                 {
-                    var paramsArray = request.getJsonArray(PARAMS);
-
                     var params = Tuple.tuple();
 
-                    for (var param : paramsArray)
+                    for (var param : request.getJsonArray(PARAMS))
                     {
                         params.addValue(param);
                     }
@@ -87,11 +84,7 @@ public class DatabaseServiceImpl implements DatabaseService
     {
         try
         {
-            var query = request.getString(QUERY);
-
-            var paramsArray = request.getJsonArray(PARAMS);
-
-            if (paramsArray == null || paramsArray.isEmpty())
+            if (request.getJsonArray(PARAMS) == null || request.getJsonArray(PARAMS).isEmpty())
             {
                 return Future.failedFuture(
                         String.valueOf(new JsonObject()
@@ -102,13 +95,11 @@ public class DatabaseServiceImpl implements DatabaseService
 
             var batchParams = new ArrayList<Tuple>();
 
-            for (var param : paramsArray)
+            for (var param : request.getJsonArray(PARAMS))
             {
-                var paramArray = (JsonArray) param;
-
                 var tuple = Tuple.tuple();
 
-                for (var value : paramArray)
+                for (var value : (JsonArray) param)
                 {
                     tuple.addValue(value);
                 }
@@ -116,7 +107,7 @@ public class DatabaseServiceImpl implements DatabaseService
                 batchParams.add(tuple);
             }
 
-            return dbClient.preparedQuery(query)
+            return dbClient.preparedQuery(request.getString(QUERY))
                     .executeBatch(batchParams)
                     .map(this::processQueryResult)
                     .recover(this::handleQueryError);

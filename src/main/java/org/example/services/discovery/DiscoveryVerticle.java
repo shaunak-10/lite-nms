@@ -76,9 +76,7 @@ public class DiscoveryVerticle extends AbstractVerticle
         {
             var request = message.body();
 
-            var action = request.getString(ACTION);
-
-            switch (action)
+            switch (request.getString(ACTION))
             {
                 case START_DISCOVERY:
 
@@ -108,7 +106,7 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                 default:
 
-                    LOGGER.warn("Unknown action: " + action);
+                    LOGGER.warn("Unknown action: " + request.getString(ACTION));
             }
         }
         catch (Exception exception)
@@ -171,16 +169,16 @@ public class DiscoveryVerticle extends AbstractVerticle
 
             // Wait for all PING and PORT checks to complete
             Future.all(deviceFutures)
-                    .compose(composite ->
+                    .compose(passedDevices ->
                     {
                         try
                         {
                             // Collect devices that passed PING and PORT checks
                             var reachableDevices = new JsonArray();
 
-                            for (var i = 0; i < composite.size(); i++)
+                            for (var i = 0; i < passedDevices.size(); i++)
                             {
-                                var result = composite.resultAt(i);
+                                var result = passedDevices.resultAt(i);
 
                                 if (result instanceof JsonObject)
                                 {
@@ -197,7 +195,8 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                             // Perform SSH check for all reachable devices in executeBlocking
                             return vertx.executeBlocking(
-                                    () -> {
+                                    () ->
+                                    {
                                         try
                                         {
                                             return PluginOperationsUtil.runSSHReachability(reachableDevices);
@@ -219,7 +218,8 @@ public class DiscoveryVerticle extends AbstractVerticle
                             return Future.failedFuture(exception);
                         }
                     })
-                    .onSuccess(sshResults -> {
+                    .onSuccess(sshResults ->
+                    {
                         try
                         {
                             var updatedResults = new JsonArray();
@@ -227,14 +227,12 @@ public class DiscoveryVerticle extends AbstractVerticle
                             if (sshResults.isEmpty())
                             {
                                 // If no results from SSH, all devices are unreachable
-                                for (int i = 0; i < defaultResults.size(); i++)
+                                for (var i = 0; i < defaultResults.size(); i++)
                                 {
                                     try
                                     {
-                                        var defaultResult = defaultResults.getJsonObject(i);
-
                                         updatedResults.add(new JsonObject()
-                                                .put(ID, defaultResult.getInteger(ID))
+                                                .put(ID, defaultResults.getJsonObject(i).getInteger(ID))
                                                 .put(REACHABLE, FALSE));
                                     }
                                     catch (Exception exception)
@@ -248,13 +246,11 @@ public class DiscoveryVerticle extends AbstractVerticle
                                 // Build lookup map only when needed
                                 var sshResultMap = new HashMap<Integer, Boolean>();
 
-                                for (int i = 0; i < sshResults.size(); i++)
+                                for (var i = 0; i < sshResults.size(); i++)
                                 {
                                     try
                                     {
-                                        var sshResult = sshResults.getJsonObject(i);
-
-                                        sshResultMap.put(sshResult.getInteger(ID), sshResult.getBoolean(REACHABLE));
+                                        sshResultMap.put(sshResults.getJsonObject(i).getInteger(ID), sshResults.getJsonObject(i).getBoolean(REACHABLE));
                                     }
                                     catch (Exception exception)
                                     {
@@ -263,13 +259,11 @@ public class DiscoveryVerticle extends AbstractVerticle
                                 }
 
                                 // Generate updated results
-                                for (int i = 0; i < defaultResults.size(); i++)
+                                for (var i = 0; i < defaultResults.size(); i++)
                                 {
                                     try
                                     {
-                                        var defaultResult = defaultResults.getJsonObject(i);
-
-                                        int id = defaultResult.getInteger(ID);
+                                        var id = defaultResults.getJsonObject(i).getInteger(ID);
 
                                         updatedResults.add(new JsonObject()
                                                 .put(ID, id)

@@ -73,15 +73,15 @@ public class DatabaseClient
 
             if (client != null)
             {
-                client.execute(ar ->
+                client.execute(connectionResult ->
                 {
-                    if (ar.succeeded())
+                    if (connectionResult.succeeded())
                     {
                         resultHandler.handle(Future.succeededFuture());
                     }
                     else
                     {
-                        resultHandler.handle(Future.failedFuture(ar.cause()));
+                        resultHandler.handle(Future.failedFuture(connectionResult.cause()));
                     }
                 });
             }

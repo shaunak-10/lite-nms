@@ -147,7 +147,7 @@ public class AuthHandler
                                         new JsonObject()
                                                 .put("username", claims.getString("username"))
                                                 .put("role", claims.getString("role")),
-                                        new JWTOptions().setExpiresInMinutes(15)
+                                        new JWTOptions().setExpiresInMinutes(ConfigLoader.get().getInteger("jwt.access.token.expire", 15))
                                 );
 
                                 ctx.response()
