@@ -403,7 +403,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                         {
                                             try
                                             {
-                                                batchParams.add(List.of(metricsResults.getJsonObject(i).getInteger(ID), metricsResults.getJsonObject(i).copy().remove(ID)));
+                                                batchParams.add(List.of(metricsResults.getJsonObject(i).remove(ID), metricsResults.getJsonObject(i)));
                                             }
                                             catch (Exception exception)
                                             {
