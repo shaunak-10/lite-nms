@@ -433,49 +433,4 @@ public class DiscoveryHandler extends AbstractCrudHandler
         }
 
     }
-
-    /**
-     * Validates the required fields for the discovery profile in the request body.
-     * Checks if the body is present and contains the necessary fields: name, IP, and credentialProfileId.
-     * If any of the fields are missing, an error response is sent to the client.
-     *
-     * @param ctx the RoutingContext containing the request data
-     * @param body the JSON object containing the fields to validate
-     * @return true if validation fails (due to missing data or invalid fields), false otherwise
-     */
-    private boolean notValidateDiscoveryFields(RoutingContext ctx, JsonObject body)
-    {
-        try
-        {
-            if (body == null)
-            {
-                handleMissingData(ctx, INVALID_JSON_BODY);
-
-                return TRUE;
-            }
-
-            var name = body.getString(NAME);
-
-            var ip = body.getString(IP);
-
-            var credentialProfileId = body.getInteger(CREDENTIAL_PROFILE_ID);
-
-            if (name == null || ip == null || credentialProfileId == 0)
-            {
-                handleMissingData(ctx, MISSING_FIELDS);
-
-                return TRUE;
-            }
-
-            return FALSE;
-        }
-        catch (Exception exception)
-        {
-            LOGGER.error("Error while validating discovery fields: " + exception.getMessage());
-
-            return TRUE;
-        }
-
-    }
-
 }
