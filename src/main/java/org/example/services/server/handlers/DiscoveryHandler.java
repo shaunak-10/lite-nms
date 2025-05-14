@@ -51,13 +51,6 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             LOGGER.info("Adding new discovery profile: " + body.encode());
 
-            if (isNotValidPort(port))
-            {
-                handleInvalidData(ctx, INVALID_PORT);
-
-                return;
-            }
-
             MainApp.getVertx().executeBlocking(() -> IpResolutionUtil.resolveAndValidateIp(body.getString(IP)))
                     .timeout(ConfigLoader.get().getInteger("ip.resolution.timeout"), TimeUnit.MILLISECONDS)
                     .onSuccess(validIp ->
@@ -243,15 +236,6 @@ public class DiscoveryHandler extends AbstractCrudHandler
 
             LOGGER.info("Updating discovery profile ID " + id + " with data: " + body.encode());
 
-            var port = body.getInteger(PORT, 22);
-
-            if (isNotValidPort(port))
-            {
-                handleInvalidData(ctx, INVALID_PORT);
-
-                return;
-            }
-
             MainApp.getVertx().executeBlocking(() -> IpResolutionUtil.resolveAndValidateIp(body.getString(IP)))
                     .timeout(ConfigLoader.get().getInteger("ip.resolution.timeout"), TimeUnit.MILLISECONDS)
                     .onSuccess(validIp ->
@@ -265,7 +249,7 @@ public class DiscoveryHandler extends AbstractCrudHandler
                                 return;
                             }
 
-                            executeQuery(UPDATE_DISCOVERY, List.of(body.getString(NAME), validIp, port, body.getInteger(CREDENTIAL_PROFILE_ID), id))
+                            executeQuery(UPDATE_DISCOVERY, List.of(body.getString(NAME), validIp, body.getInteger(PORT, 22), body.getInteger(CREDENTIAL_PROFILE_ID), id))
                                     .onSuccess(result ->
                                     {
                                         try
