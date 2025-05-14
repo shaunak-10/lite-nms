@@ -70,9 +70,9 @@ public class MainApp
 
                             deployAllVerticles()
                                     .onSuccess(v -> LOGGER.info("🚀 All verticles deployed successfully!"))
-                                    .onFailure(err ->
+                                    .onFailure(error ->
                                     {
-                                        LOGGER.error("❌ Failed to deploy verticles: " + err.getMessage());
+                                        LOGGER.error("❌ Failed to deploy verticles: " + error.getMessage());
 
                                         DatabaseClient.close()
                                                 .compose(v -> vertx.close());

@@ -79,11 +79,11 @@ public class SchedulerServiceImpl implements SchedulerService
 
                 return Future.succeededFuture("Polling scheduled");
 
-            }).recover(err ->
+            }).recover(error ->
             {
-                LOGGER.error("Failed to initialize device map: " + err.getMessage());
+                LOGGER.error("Failed to initialize device map: " + error.getMessage());
 
-                return Future.failedFuture("Failed to start polling: " + err.getMessage());
+                return Future.failedFuture("Failed to start polling: " + error.getMessage());
             });
         }
         catch (Exception exception)
@@ -386,7 +386,7 @@ public class SchedulerServiceImpl implements SchedulerService
                                                         .put(QUERY, ADD_AVAILABILITY_DATA)
                                                         .put(PARAMS, availabilityParams))
                                                 .onSuccess(res -> LOGGER.info("Availability records inserted: " + availabilityParams.size()))
-                                                .onFailure(err -> LOGGER.error("Availability insert failed: " + err.getMessage()));
+                                                .onFailure(error -> LOGGER.error("Availability insert failed: " + error.getMessage()));
 
                                         if (metricsResults.isEmpty())
                                         {
@@ -425,16 +425,16 @@ public class SchedulerServiceImpl implements SchedulerService
                                                         LOGGER.warn("Batch insert failed: " + batchResponse.getString(ERROR));
                                                     }
                                                 })
-                                                .onFailure(err -> LOGGER.error("Batch insert failed: " + err.getMessage()));
+                                                .onFailure(error -> LOGGER.error("Batch insert failed: " + error.getMessage()));
                                     }
                                     catch (Exception exception)
                                     {
                                         LOGGER.error("Failed to process metrics results: " + exception.getMessage());
                                     }
                                 })
-                                .onFailure(err ->
+                                .onFailure(error ->
                                 {
-                                    LOGGER.error("Polling pipeline failed: " + err.getMessage());
+                                    LOGGER.error("Polling pipeline failed: " + error.getMessage());
 
                                     // Update availability as false for all devices on failure
                                     var availabilityParams = new JsonArray(
@@ -455,7 +455,7 @@ public class SchedulerServiceImpl implements SchedulerService
                         LOGGER.error("Failed to process DB response: " + exception.getMessage());
                     }
                 })
-                .onFailure(err -> LOGGER.error("DB query failed: " + err.getMessage()));
+                .onFailure(error -> LOGGER.error("DB query failed: " + error.getMessage()));
     }
 
     /**

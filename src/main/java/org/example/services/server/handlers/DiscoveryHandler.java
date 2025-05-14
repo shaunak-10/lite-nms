@@ -112,9 +112,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
                             LOGGER.error("Error while resolving IP: " + exception.getMessage());
                         }
                     })
-                    .onFailure(err ->
+                    .onFailure(error ->
                     {
-                        LOGGER.warn("Error during IP resolution: " + err.getMessage());
+                        LOGGER.warn("Error during IP resolution: " + error.getMessage());
 
                         handleInvalidData(ctx, INVALID_IP);
                     });
@@ -295,9 +295,9 @@ public class DiscoveryHandler extends AbstractCrudHandler
                             LOGGER.error("Error while resolving IP: " + exception.getMessage());
                         }
                     })
-                    .onFailure(err ->
+                    .onFailure(error ->
                     {
-                        LOGGER.error("IP resolution failed during update: " + err.getMessage());
+                        LOGGER.error("IP resolution failed during update: " + error.getMessage());
 
                         handleInvalidData(ctx, INVALID_IP);
                     });

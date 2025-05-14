@@ -163,7 +163,7 @@ public class AuthHandler
                                 ctx.response().setStatusCode(500).end("Internal server error");
                             }
                         })
-                        .onFailure(err -> ctx.response()
+                        .onFailure(error -> ctx.response()
                                 .setStatusCode(401)
                                 .end("Invalid or expired refresh token"));
             }

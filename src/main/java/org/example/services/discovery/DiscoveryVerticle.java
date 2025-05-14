@@ -331,7 +331,7 @@ public class DiscoveryVerticle extends AbstractVerticle
 
                             return executeQuery(UPDATE_DISCOVERY_STATUS, List.of(result.getBoolean(REACHABLE) ? ACTIVE : INACTIVE, id))
                                     .onSuccess(res -> LOGGER.info("Discovery status updated for device ID: " + id))
-                                    .onFailure(err -> LOGGER.error("Failed to update status for device ID " + id + ": " + err.getMessage()));
+                                    .onFailure(error -> LOGGER.error("Failed to update status for device ID " + id + ": " + error.getMessage()));
                         }
                         catch (Exception exception)
                         {
@@ -344,7 +344,7 @@ public class DiscoveryVerticle extends AbstractVerticle
 
             // Wait for all updates to complete
             Future.all(updateFutures)
-                    .onFailure(err -> LOGGER.error("Failed to update some discovery statuses: " + err.getMessage()));
+                    .onFailure(error -> LOGGER.error("Failed to update some discovery statuses: " + error.getMessage()));
         }
         catch (Exception exception)
         {
