@@ -167,8 +167,6 @@ public class AppConstants
 
         public static final String MISSING_FIELDS = "Required fields are Missing / Invalid";
 
-        public static final String NO_DATA_TO_UPDATE = "No data provided for update";
-
         public static final String INVALID_ID_IN_PATH = "Invalid ID in path";
 
         public static final String FAILED_TO_FETCH = "Failed to fetch";
@@ -186,10 +184,6 @@ public class AppConstants
         public static final String DEVICE_NOT_DISCOVERED = "Device not discovered";
 
         public static final String UPDATE_NOT_ALLOWED = "Update operation is not permitted for provisioned devices";
-
-        public static final String NO_DEVICES_FOR_DISCOVERY = "No devices found for discovery or ping/port of all devices were not reachable";
-
-        public static final String PLUGIN_EXECUTION_FAILED = "plugin execution failed";
     }
 
     public static class Headers
