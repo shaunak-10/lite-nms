@@ -75,13 +75,22 @@ public class DatabaseClient
             {
                 client.execute(connectionResult ->
                 {
-                    if (connectionResult.succeeded())
+                    try
                     {
-                        resultHandler.handle(Future.succeededFuture());
+                        if (connectionResult.succeeded())
+                        {
+                            resultHandler.handle(Future.succeededFuture());
+                        }
+                        else
+                        {
+                            resultHandler.handle(Future.failedFuture(connectionResult.cause()));
+                        }
                     }
-                    else
+                    catch (Exception exception)
                     {
-                        resultHandler.handle(Future.failedFuture(connectionResult.cause()));
+                        LOGGER.error("Error while testing connection: " + exception.getMessage());
+
+                        resultHandler.handle(Future.failedFuture(exception));
                     }
                 });
             }
