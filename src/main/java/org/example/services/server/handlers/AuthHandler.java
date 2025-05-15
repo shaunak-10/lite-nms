@@ -182,36 +182,43 @@ public class AuthHandler
      */
     private void secureRoutes(Router router)
     {
-        // Protect API routes with JWT authentication
-        router.route("/credentials/*").handler(JWTAuthHandler.create(jwtAuth));
-
-        router.route("/discovery/*").handler(JWTAuthHandler.create(jwtAuth));
-
-        router.route("/provision/*").handler(JWTAuthHandler.create(jwtAuth));
-
-        // Add a failure handler for authentication errors
-        router.route().failureHandler(ctx ->
+        try
         {
-            try
+            // Protect API routes with JWT authentication
+            router.route("/credentials/*").handler(JWTAuthHandler.create(jwtAuth));
+
+            router.route("/discovery/*").handler(JWTAuthHandler.create(jwtAuth));
+
+            router.route("/provision/*").handler(JWTAuthHandler.create(jwtAuth));
+
+            // Add a failure handler for authentication errors
+            router.route().failureHandler(ctx ->
             {
-                if (ctx.statusCode() == 401)
+                try
                 {
-                    ctx.response()
-                            .setStatusCode(401)
-                            .putHeader(CONTENT_TYPE, APPLICATION_JSON)
-                            .end(new JsonObject()
-                                    .put(ERROR, "Unauthorized: Please login first")
-                                    .encodePrettily());
+                    if (ctx.statusCode() == 401)
+                    {
+                        ctx.response()
+                                .setStatusCode(401)
+                                .putHeader(CONTENT_TYPE, APPLICATION_JSON)
+                                .end(new JsonObject()
+                                        .put(ERROR, "Unauthorized: Please login first")
+                                        .encodePrettily());
+                    }
+                    else
+                    {
+                        ctx.next();
+                    }
                 }
-                else
+                catch (Exception exception)
                 {
-                    ctx.next();
+                    LOGGER.error("Error in failure handler", exception);
                 }
-            }
-            catch (Exception exception)
-            {
-                LOGGER.error("Error in failure handler", exception);
-            }
-        });
+            });
+        }
+        catch (Exception exception)
+        {
+            LOGGER.error("Error securing routes", exception);
+        }
     }
 }
