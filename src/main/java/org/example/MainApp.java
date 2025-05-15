@@ -121,7 +121,7 @@ public class MainApp
             for (var verticle : verticles)
             {
                 chain = chain.compose(ignored ->
-                        MainApp.vertx.deployVerticle(verticle.getName())
+                        vertx.deployVerticle(verticle.getName())
                                 .onSuccess(id ->
                                         LOGGER.info("✅ Deployed: " + verticle.getSimpleName()))
                                 .mapEmpty()
