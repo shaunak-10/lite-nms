@@ -396,25 +396,4 @@ public class DiscoveryHandler extends AbstractCrudHandler
             LOGGER.error("Error while running discovery: " + exception.getMessage());
         }
     }
-
-    /**
-     * Validates if the provided port number is within the valid range (1-65535).
-     *
-     * @param port the port number to validate
-     * @return true if the port is invalid (not in the valid range), false otherwise
-     */
-    public static boolean isNotValidPort(int port)
-    {
-        try
-        {
-            return !(port >= 1) || !(port <= 65535);
-        }
-        catch (Exception exception)
-        {
-            LOGGER.error("Invalid port: " + exception.getMessage());
-
-            return TRUE;
-        }
-
-    }
 }
